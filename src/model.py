@@ -72,9 +72,10 @@ class Attention(nn.Module):
 
         return scores
 
-    def forward(self, q, k, v, attention_mask=None):
-        q, k, v = self.wq(q), self.wk(k), self.wv(v)
-        q, k, v = map(lambda x: self.split_heads(x), (q, k, v))
+    def forward(self, x, attention_mask=None):
+        q = self.split_heads(self.wq(x))
+        k = self.split_heads(self.wk(x))
+        v = self.split_heads(self.wv(x))
 
         attention_scores = self.attention(q, k, v, attention_mask)
         attention_scores = self.merge_heads(attention_scores)
@@ -121,8 +122,8 @@ class Decoder(nn.Module):
         self.layer_norm1 = LayerNorm(normalized_shape=emb_dim, eps=1e-5)
         self.layer_norm2 = LayerNorm(normalized_shape=emb_dim, eps=1e-5)
 
-    def forward(self, x):
-        x += self.attention(self.layer_norm1(x))
+    def forward(self, x, attention_mask):
+        x += self.attention(self.layer_norm1(x, attention_mask))
         x += self.feedforward(self.layer_norm2(x))
 
         return x
@@ -165,10 +166,23 @@ class GPT2Model(nn.Module):
         self.token_embs = embeddings
 
     def forward(self, x):
-        pos_ids = torch.arange(0, x.size(-1)).unsqueeze(0)
-        input_emb = self.token_embs(x) + self.pos_embs(pos_ids)
-        input_emb = self.dropout(input_emb)
+        """
+        Arg:
+            x: Tuple(input_ids, attention_mask)
+                e.g., tokenizer("날씨가 매우 화창하다.")
+                        input_ids: [34018, 9655, 9192, 8344, 19572]
+                        attention_mask: [1, 1, 1, 1, 1]
+        """
+        input_ids, attention_mask = x
+        
+        pos_ids = torch.arange(0, input_ids.size(-1)).unsqueeze(0)
+        input_embs = self.token_embs(input_ids) + self.pos_embs(pos_ids)
+        input_embs = self.dropout(input_embs)
 
-        logits = self.fc(self.layer_norm(self.decoder(input_emb)))
+        if attention_mask is not None:
+            attention_mask = attention_mask.view(input_ids.size(0), 1, 1, -1) # (N, 1, 1, seq_len)
+            attention_mask = (1.0 - attention_mask) * -10000.0
+
+        logits = self.fc(self.layer_norm(self.decoder(input_embs, attention_mask)))
 
         return logits
