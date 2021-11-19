@@ -19,11 +19,11 @@ class Tokenizer(object):
 
         return tokens
 
-    def encode(self, sentence): # Encode works for only single sentence
+    def encode(self, sentence): # Encode words for only single sentence
         tokens = self.mecab.morphs(sentence)
         return self.convert_tokens_to_ids(tokens)
 
-    def decode(self, ids): # Decode works for only single sentence
+    def decode(self, ids): # Decode ids for only single sentence
         return self.convert_ids_to_sentence(ids)
 
     def convert_tokens_to_ids(self, tokens):
