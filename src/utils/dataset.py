@@ -71,17 +71,16 @@ class Vocabulary(object):
 
 
 class Collate(object):
-  def __init__(self, pad_token_id):
-    self.pad_token_id = pad_token_id
-  
-  def __call__(self, data):
-    print(data)
-    x, y, e = data
-    x = pad_sequence(x, batch_first=True, padding_value=self.pad_token_id).long()
-    y = pad_sequence(y, batch_first=True, padding_value=self.pad_token_id).long()
-    e = torch.stack(e, dim=0)
+    def __init__(self, pad_token_id):
+        self.pad_token_id = pad_token_id
 
-    return x, y, e
+    def __call__(self, data):
+        x, y, e = data
+        x = pad_sequence(x, batch_first=True, padding_value=self.pad_token_id).long()
+        y = pad_sequence(y, batch_first=True, padding_value=self.pad_token_id).long()
+        e = torch.stack(e, dim=0)
+
+        return x, y, e
 
 
 def get_dataloader(dataset, pad_token_id, train=True):
