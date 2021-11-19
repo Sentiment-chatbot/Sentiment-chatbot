@@ -20,7 +20,7 @@ class Attention(nn.Module):
         self.emb_dim = emb_dim
         self.num_heads = num_heads
         self.head_dim = emb_dim // num_heads
-        assert self.head_dim * self.num_heads != self.emb_dim, "Invalid (emb_dim, num_heads) pair."
+        assert self.head_dim * self.num_heads == self.emb_dim, "Invalid (emb_dim, num_heads) pair."
 
         self.max_seq_len = max_seq_len
 

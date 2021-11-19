@@ -37,7 +37,7 @@ def init_weight(module: nn.Module):
     if isinstance(module, nn.Embedding):
         module.weight.data.normal_(mean=0.0, std=0.02)
     elif isinstance(module, nn.Linear):
-        module.weight.data_normal_(mean=0.0, std=0.02)
+        module.weight.data.normal_(mean=0.0, std=0.02)
         if module.bias is not None:
             module.bias.data.zero_()
     elif isinstance(module, LayerNorm):
