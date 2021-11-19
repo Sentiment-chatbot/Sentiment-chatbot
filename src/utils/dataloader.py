@@ -1,7 +1,7 @@
 import pandas as pd
+import json
 
-
-def load_dataset(
+def load(
     data_path,
     ignored_columns=[
         "profile.persona-id",
