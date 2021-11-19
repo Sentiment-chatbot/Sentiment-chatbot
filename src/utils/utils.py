@@ -8,9 +8,8 @@ import torch.nn as nn
 from torch.nn.modules.normalization import LayerNorm
 from torch.backends import cudnn
 
-
 def set_seed(seed):
-    os.environ['PYTHONHASHSEED'] = str(SEED)
+    os.environ['PYTHONHASHSEED'] = str(seed)
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
