@@ -1,10 +1,10 @@
-from konlpy.tag import Okt
+from konlpy.tag import Mecab
 
 
 class Tokenizer(object):
     def __init__(self, vocab):
         self.vocab = vocab
-        self.mecab = Okt()
+        self.mecab = Mecab()
 
     def __call__(self, x, max_length=None):
         tokens = None

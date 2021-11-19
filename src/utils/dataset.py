@@ -3,7 +3,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from utils import get_num_workers
-from konlpy.tag import Okt
+from konlpy.tag import Mecab
 
 
 
@@ -31,7 +31,7 @@ class Vocabulary(object):
         self.word2idx = {}
         self.idx2word = {}
         self.idx = 0
-        self.mecab = Okt()
+        self.mecab = Mecab()
 
         self.add_word("<pad>")
         self.add_word("<s>")
