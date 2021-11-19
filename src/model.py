@@ -9,6 +9,7 @@ from .utils import init_weight
 
 
 class Attention(nn.Module):
+    """ Multi-head attention """
     def __init__(
         self,
         emb_dim,
@@ -24,66 +25,93 @@ class Attention(nn.Module):
 
         self.max_seq_len = max_seq_len
 
+        # bias is used for making causal attention masks
         self.register_buffer(
             "bias",
             torch.tril(torch.ones((max_seq_len, max_seq_len), dtype=torch.uint8)).view(
                 1, 1, max_seq_len, max_seq_len
             )
         )
-        self.register_buffer("masked_bias", torch.tensor(-1e4))
 
-        self.wq = nn.Linear(in_features=emb_dim, out_features=emb_dim * num_heads)
-        self.wk = nn.Linear(in_features=emb_dim, out_features=emb_dim * num_heads)
-        self.wv = nn.Linear(in_features=emb_dim, out_features=emb_dim * num_heads)
+        # In our implementation, head_dim * num_heads == emb_dim
+        # Notation "head_dim * num_heads" is used for clarifying
+        self.wq = nn.Linear(in_features=emb_dim, out_features=self.head_dim * num_heads)
+        self.wk = nn.Linear(in_features=emb_dim, out_features=self.head_dim * num_heads)
+        self.wv = nn.Linear(in_features=emb_dim, out_features=self.head_dim * num_heads)
         self.fc = nn.Linear(in_features=emb_dim, out_features=emb_dim)
 
         self.dropout = nn.Dropout(p=dropout)
 
     def split_heads(self, x):
         """
-        funct: (N, seq_len, emb_dim * num_heads) -> (N, num_heads, seq_len, emb_dim)
+        Args:
+            x: (N, seq_len, emb_dim) == (N, seq_len, head_dim * num_heads)
+        Funct: 
+            (N, seq_len, head_dim * num_heads) -> (N, num_heads, seq_len, head_dim)
         """
         batch_size, seq_len, _ = x.size()
-        x = x.view(batch_size, seq_len, self.num_heads, self.emb_dim)
+        x = x.view(batch_size, seq_len, self.num_heads, self.head_dim)
 
         return x.permute(0, 2, 1, 3)
 
     def merge_heads(self, x):
         """
-        funct: (N, num_heads, seq_len, emb_dim) -> (N, seq_len, emb_dim * num_heads)
+        Args:
+            (N, num_heads, seq_len, head_dim) -> (N, seq_len, head_dim * num_heads)
+        Funct:
+            (N, num_heads, seq_len, head_dim) -> (N, seq_len, head_dim * num_heads) == (N, seq_len, emb_dim)
         """
-        batch_size, num_heads, seq_len, emb_dim = x.size()
+        batch_size, num_heads, seq_len, head_dim = x.size()
         x = x.permute(0, 2, 1, 3).contiguous()
 
-        return x.view(batch_size, seq_len, num_heads * emb_dim)
+        return x.view(batch_size, seq_len, num_heads * head_dim)
 
     def attention(self, q, k, v, attention_mask=None):
         """
-        funct: calculate attention score ...
+        Args:
+            q: (N, num_heads, seq_len, head_dim)
+            k: (N, num_heads, seq_len, head_dim)
+            v: (N, num_heads, seq_len, head_dim)
+            attention_mask: (N, 1, 1, seq_len) if not None
+        Funct: calculate attention score
             Softmax((Q @ K^T) / sqrt(d_k)) @ V
         """
-        scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(k.size(-1))
+        
+        scores = torch.matmul(
+            q, k.transpose(-2, -1)) / math.sqrt(k.size(-1)
+        )  # (N, num_heads, seq_len, seq_len)
+        
+        # Masked self-attention
+        causal_mask = self.bias[:, :, q.size(-2), q.size(-2)].bool()
+        scores = torch.where(causal_mask, scores, torch.tensor(1e-4))
+        
         if attention_mask is not None:
-            scores += attention_mask
-        scores = nn.Softmax(dim=-1)(scores)
-        scores = self.dropout(scores)
-        scores = torch.matmuL(scores, v)
+            scores += attention_mask # broadcasting => (N, num_heads, seq_len, seq_len)
+        scores = nn.Softmax(dim=-1)(scores) # (N, num_heads, seq_len, seq_len)
+        scores = self.dropout(scores) # (N, num_heads, seq_len, seq_len)
+        scores = torch.matmul(scores, v) # (N, num_heads, seq_len, head_dim)
 
-        return scores
+        return scores # (N, num_heads, seq_len, head_dim)
 
     def forward(self, x, attention_mask=None):
-        q = self.split_heads(self.wq(x))
-        k = self.split_heads(self.wk(x))
-        v = self.split_heads(self.wv(x))
+        """
+        Args:
+            x: (N, seq_len, emb_dim)
+            attention_mask: (N, 1, 1, seq_len) if not None
+        """
+        q = self.split_heads(self.wq(x)) # (N, num_heads, seq_len, head_dim)
+        k = self.split_heads(self.wk(x)) # (N, num_heads, seq_len, head_dim)
+        v = self.split_heads(self.wv(x)) # (N, num_heads, seq_len, head_dim)
 
-        attention_scores = self.attention(q, k, v, attention_mask)
-        attention_scores = self.merge_heads(attention_scores)
-        attention_scores = self.dropout(self.fc(attention_scores))
+        attention_scores = self.attention(q, k, v, attention_mask) # (N, num_heads, seq_len, head_dim)
+        attention_scores = self.merge_heads(attention_scores) # (N, seq_len, head_dim * num_heads)
+        attention_scores = self.dropout(self.fc(attention_scores)) # (N, seq_len, emb_dim)
 
-        return attention_scores
+        return attention_scores # (N, seq_len, emb_dim)
 
 
 class FeedForward(nn.Module):
+    """ Feed-forward layer of decoder(Transformer) module """
     def __init__(self, emb_dim=768, dropout=0.1):
         super().__init__()
         inner_state_dim = emb_dim * 4
@@ -94,11 +122,18 @@ class FeedForward(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x):
-        out = self.dropout(self.fc2(self.gelu(self.fc1(x))))
-        return out
+        """
+        Args:
+            x: (N, seq_len, emb_dim)
+        """
+        out = self.gelu(self.fc1(x)) # (N, seq_len, inner_state_dim)
+        out = self.dropout(self.fc2(out)) # (N, seq_len, emb_dim)
+
+        return out # (N, seq_len, emb_dim)
 
 
 class Decoder(nn.Module):
+    """ Transformer decoder block """
     def __init__(
         self,
         emb_dim,
@@ -120,14 +155,22 @@ class Decoder(nn.Module):
         self.layer_norm1 = LayerNorm(normalized_shape=emb_dim, eps=1e-5)
         self.layer_norm2 = LayerNorm(normalized_shape=emb_dim, eps=1e-5)
 
-    def forward(self, x, attention_mask):
-        x += self.attention(self.layer_norm1(x, attention_mask))
-        x += self.feedforward(self.layer_norm2(x))
+    def forward(self, x, attention_mask): 
+        """
+        Args:
+            x:(N, seq_len, emb_dim)
+            attention_mask:(N, 1, 1, seq_len)
+        """
+        x += self.attention(self.layer_norm1(x), attention_mask) # (N, seq_len, emb_dim)
+        x += self.feedforward(self.layer_norm2(x)) # (N, seq_len, emb_dim)
 
-        return x
+        return x # (N, seq_len, emb_dim)
 
 
 class GPT2Model(nn.Module):
+    """ 
+        GPT-2 with last fully connected layer which is used for LM head 
+    """
     def __init__(
         self,
         vocab_size,
@@ -140,22 +183,20 @@ class GPT2Model(nn.Module):
         super().__init__()
         self.token_embs = nn.Embedding(vocab_size, emb_dim)
         self.pos_embs = nn.Embedding(max_seq_len, emb_dim)
+        self.dropout = nn.Dropout(p=dropout)
 
-        blocks = [
+        self.decoders = nn.ModuleList(
             Decoder(
                 emb_dim=emb_dim,
                 max_seq_len=max_seq_len,
                 num_heads=num_heads,
                 dropout=dropout
             ) for _ in range(num_layers)
-        ]
-        self.dropout = nn.Dropout(p=dropout)
-
-        self.decoder = nn.Sequential(*blocks)
+        )
         self.layer_norm = LayerNorm(normalized_shape=emb_dim, eps=1e-5)
         self.fc = nn.Linear(in_features=emb_dim, out_features=vocab_size, bias=False)
 
-        self.apply(init_weight)
+        self.apply(init_weight) # Initializes weights of all inner layers
 
     def get_input_embeddings(self):
         return self.token_embs
@@ -163,24 +204,50 @@ class GPT2Model(nn.Module):
     def set_input_embeddings(self, embeddings):
         self.token_embs = embeddings
 
-    def forward(self, x):
+    def forward(self, input_ids, attention_mask=None):
         """
         Arg:
-            x: Tuple(input_ids, attention_mask)
-                e.g., tokenizer("날씨가 매우 화창하다.")
-                        input_ids: [34018, 9655, 9192, 8344, 19572]
-                        attention_mask: [1, 1, 1, 1, 1]
+            input_ids: (N, seq_len)
+            attention_mask: (N, seq_len)
+
+            Example 1) Single sentence
+                tokenizer("날씨가 굉장히 화창하네?")
+                input_ids: 
+                    [34018, 40052, 8168, 8811, 9192, 8344, 8702, 7098, 406]
+                attention_mask:
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1]
+                decoded:
+                    '▁날씨가', '▁굉', '장', '히', '▁화', '창', '하', '네', '?'
+                
+            Example 2) Batched sentences
+                tokenizer(["날씨가 굉장히 화창하네?", "정말 그렇네요."])
+                input_ids: [
+                    [34018, 40052, 8168, 8811, 9192, 8344, 8702, 7098, 406],
+                    [29205, 11928, 7098, 25856, 3, 3, 3, 3, 3]
+                ]
+                attention_mask: [
+                    [1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    [1, 1, 1, 1, 0, 0, 0, 0, 0]
+                ]
+                decoded: 
+                    '▁날씨가', '▁굉', '장', '히', '▁화', '창', '하', '네', '?'
+                    '▁정말', '▁그렇', '네', '요.', '<pad>', '<pad>', '<pad>', '<pad>', '<pad>'
+        Return:
+            logits: (N, seq_len, vocab_size)
+            Each of the logits indicate a confidence of each word for each position
         """
-        input_ids, attention_mask = x
-        
-        pos_ids = torch.arange(0, input_ids.size(-1)).unsqueeze(0)
-        input_embs = self.token_embs(input_ids) + self.pos_embs(pos_ids)
-        input_embs = self.dropout(input_embs)
+
+        pos_ids = torch.arange(0, input_ids.size(-1)).unsqueeze(0) # (1, seq_len)
+        input_embs = self.token_embs(input_ids) + self.pos_embs(pos_ids) # (N, seq_len, emb_dim)
+        input_embs = self.dropout(input_embs) # (N, seq_len, emb_dim)
 
         if attention_mask is not None:
             attention_mask = attention_mask.view(input_ids.size(0), 1, 1, -1) # (N, 1, 1, seq_len)
-            attention_mask = (1.0 - attention_mask) * -10000.0
+            attention_mask = (1.0 - attention_mask) * -10000.0 # (N, 1, 1, seq_len)
 
-        logits = self.fc(self.layer_norm(self.decoder(input_embs, attention_mask)))
+        logits = input_embs # (N, seq_len, emb_dim)
+        for decoder in self.decoders:
+            logits = decoder(logits, attention_mask) # (N, seq_len, emb_dim)
+        logits = self.fc(self.layer_norm(logits)) # (N, seq_len, vocab_size)
 
         return logits
