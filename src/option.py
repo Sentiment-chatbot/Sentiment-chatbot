@@ -17,7 +17,8 @@ def get_option_arg_parser():
                         help='Number of sweeps over the dataset to train')
     parser.add_argument('--learning-rate', '-lr', type=float, default=1e-4,
                         help='Learning rate')
-
+    parser.add_argument('--seed', '-s', type=float, default=1e-4,
+                        help='Random seed')
     return parser
 
 
