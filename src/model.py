@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.normalization import LayerNorm
 
-from utils import init_weight
+from .utils import init_weight
 
 
 class Attention(nn.Module):
@@ -14,7 +14,6 @@ class Attention(nn.Module):
         emb_dim,
         max_seq_len,
         num_heads=12,
-        attention_dropout=0.1,
         dropout=0.1
     ):
         super().__init__()
@@ -110,10 +109,9 @@ class Decoder(nn.Module):
         super().__init__()
         self.attention = Attention(
             emb_dim=emb_dim,
-            num_heads=num_heads,
             max_seq_len=max_seq_len,
-            attention_dropout=attention_dropout,
-            fc_dropout=fc_dropout
+            num_heads=num_heads,
+            dropout=dropout
         )
         self.feedforward = FeedForward(
             emb_dim=emb_dim,
@@ -146,8 +144,8 @@ class GPT2Model(nn.Module):
         blocks = [
             Decoder(
                 emb_dim=emb_dim,
-                num_heads=num_heads,
                 max_seq_len=max_seq_len,
+                num_heads=num_heads,
                 dropout=dropout
             ) for _ in range(num_layers)
         ]
