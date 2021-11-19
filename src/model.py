@@ -83,7 +83,7 @@ class Attention(nn.Module):
         
         # Masked self-attention
         causal_mask = self.bias[:, :, q.size(-2), q.size(-2)].bool()
-        scores = torch.where(causal_mask, scores, torch.tensor(1e-4))
+        scores = torch.where(causal_mask, scores, torch.tensor(-1e4))
         
         if attention_mask is not None:
             scores += attention_mask # broadcasting => (N, num_heads, seq_len, seq_len)
