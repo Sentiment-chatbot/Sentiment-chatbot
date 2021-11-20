@@ -26,6 +26,6 @@ def get_arg_parser():
 
 
 if __name__ == '__main__':
-    parser = get_option_arg_parser()
+    parser = get_arg_parser()
     args = parser.parse_args()
     # print(json.dumps(args.__dict__, indent=2))
