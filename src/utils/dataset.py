@@ -5,6 +5,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader, TensorDataset
 from torch.nn.utils.rnn import pad_sequence
 from soynlp.tokenizer import LTokenizer
+
 from .utils import get_num_workers
 from .tokenizer import Tokenizer
 

@@ -33,11 +33,7 @@ class Attention(nn.Module):
             )
         )
 
-        # In our implementation, head_dim * num_heads == emb_dim
-        # Notation "head_dim * num_heads" is used for clarifying
-        self.wq = nn.Linear(in_features=emb_dim, out_features=self.head_dim * num_heads)
-        self.wk = nn.Linear(in_features=emb_dim, out_features=self.head_dim * num_heads)
-        self.wv = nn.Linear(in_features=emb_dim, out_features=self.head_dim * num_heads)
+        self.wqkv = nn.Linear(in_features=emb_dim, out_features=emb_dim * 3)
         self.fc = nn.Linear(in_features=emb_dim, out_features=emb_dim)
 
         self.dropout = nn.Dropout(p=dropout)
@@ -99,9 +95,10 @@ class Attention(nn.Module):
             x: (N, seq_len, emb_dim)
             attention_mask: (N, 1, 1, seq_len) if not None
         """
-        q = self.split_heads(self.wq(x)) # (N, num_heads, seq_len, head_dim)
-        k = self.split_heads(self.wk(x)) # (N, num_heads, seq_len, head_dim)
-        v = self.split_heads(self.wv(x)) # (N, num_heads, seq_len, head_dim)
+
+        x = self.wqkv(x)
+        q, k, v = x.split(self.emb_dim, dim=-1)
+        q, k, v = map(lambda m: self.split_heads(m), (q, k, v))
 
         attention_scores = self.attention(q, k, v, attention_mask) # (N, num_heads, seq_len, head_dim)
         attention_scores = self.merge_heads(attention_scores) # (N, seq_len, head_dim * num_heads)
