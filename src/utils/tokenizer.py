@@ -1,10 +1,10 @@
-from konlpy.tag import Mecab
+from soynlp.tokenizer import LTokenizer
 
 
 class Tokenizer(object):
     def __init__(self, vocab):
         self.vocab = vocab
-        self.mecab = Mecab()
+        self.tokenizer = LTokenizer
 
     def __call__(self, x, max_length=None):
         tokens = None
@@ -20,7 +20,7 @@ class Tokenizer(object):
         return tokens
 
     def encode(self, sentence): # Encode words for only single sentence
-        tokens = self.mecab.morphs(sentence)
+        tokens = self.tokenizer.tokenize(sentence)
         return self.convert_tokens_to_ids(tokens)
 
     def decode(self, ids): # Decode ids for only single sentence

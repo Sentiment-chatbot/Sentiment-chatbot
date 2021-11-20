@@ -1,11 +1,12 @@
 import os
 import os.path as p
+import pickle
 
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from .utils.dataset import Vocabulary
+from .dataset import Vocabulary
 
 
 def load_emotion_df(xls_path):
@@ -34,11 +35,26 @@ def load_emotion_df(xls_path):
     df["emotion_1"] = df["emotion_1"].str.strip()
     df["emotion_2"] = df["emotion_2"].str.strip()
     y = df["emotion_2"]
-    
+
     return df, y
 
-# def split_single_turn(df, columns=[q1, a1, q2, a2, q3, a3, q4, a4]):
-#     for 
+def split_single_turn(df):
+    splited_df = pd.DataFrame(columns=['q', 'a', 'emotion_1', 'emotion_2'])
+
+    pairs = [("q1", "a1"), ("q2", "a2"), ("q3", "a3"), ("q4", "a4")]
+    for pair in pairs:
+        q, a = pair
+        pair_df = pd.DataFrame({
+            'q': df[q],
+            'a': df[a],
+            'emotion_1': df["emotion_1"],
+            'emotion_2': df["emotion_2"]
+        })
+        splited_df = splited_df.append(pair_df, ignore_index=True)
+    splited_df = splited_df.drop_duplicates(subset=None, keep='first', ignore_index=False)
+    splited_df = splited_df.dropna(axis=0)
+
+    return splited_df
 
 def make_dataframe(src_path, dst_path):
     train_path = p.join(src_path, "raw/train.xlsx")
@@ -50,15 +66,30 @@ def make_dataframe(src_path, dst_path):
     train_df, test_df, *_ = train_test_split(train_df, train_y, test_size=0.1, stratify=train_y)
 
     for df, name in zip((train_df, valid_df, test_df), ("train", "valid", "test")):
-        df.to_csv(p.join(dst_path, f"{name}.csv"), sep='\t', na_rep="")
+        splited_df = split_single_turn(df)
+        splited_df.to_csv(p.join(dst_path, f"{name}.csv"), sep='\t', na_rep="")
 
 def get_dataframe(src_path):
     dfs = []
     for name in ("train", "valid", "test"):
         df = pd.read_csv(p.join(src_path, f"{name}.csv"), sep='\t')
+        df = df.dropna(axis=0) # 추후 수정 필요, 왜 결측값 제거가 preprocessing에서 안되는지 모르겠음
         dfs.append(df)
 
     return dfs
 
 def make_vocab(src_dfs, dst_path):
     vocabulary = Vocabulary()
+
+    for df in src_dfs:
+        vocabulary.make_vocab(df)
+
+    with open(p.join(dst_path, "vocab.pkl"), "wb") as f:
+        pickle.dump(vocabulary, f)
+
+def get_vocab(src_path):
+    vocab = None
+    with open(p.join(src_path, "vocab.pkl"), "rb") as f:
+        vocab = pickle.load(f)
+
+    return vocab

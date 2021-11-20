@@ -83,7 +83,7 @@ class Attention(nn.Module):
         
         # Masked self-attention
         causal_mask = self.bias[:, :, q.size(-2), q.size(-2)].bool()
-        scores = torch.where(causal_mask, scores, torch.tensor(-1e4))
+        scores = torch.where(causal_mask, scores, torch.tensor(-1e4, device=self.device))
         
         if attention_mask is not None:
             scores += attention_mask # broadcasting => (N, num_heads, seq_len, seq_len)
@@ -178,7 +178,8 @@ class GPT2Model(nn.Module):
         max_seq_len,
         num_heads=12,
         num_layers=12,
-        dropout=0.1
+        dropout=0.1,
+        device=None
     ):
         super().__init__()
         self.token_embs = nn.Embedding(vocab_size, emb_dim)
@@ -195,6 +196,8 @@ class GPT2Model(nn.Module):
         )
         self.layer_norm = LayerNorm(normalized_shape=emb_dim, eps=1e-5)
         self.fc = nn.Linear(in_features=emb_dim, out_features=vocab_size, bias=False)
+
+        self.device = device
 
         self.apply(init_weight) # Initializes weights of all inner layers
 
@@ -235,9 +238,8 @@ class GPT2Model(nn.Module):
         Return:
             logits: (N, seq_len, vocab_size)
             Each of the logits indicate a confidence of each word for each position
-        """
-
-        pos_ids = torch.arange(0, input_ids.size(-1)).unsqueeze(0) # (1, seq_len)
+        """        
+        pos_ids = torch.arange(0, input_ids.size(-1), device=self.device).unsqueeze(0) # (1, seq_len)
         input_embs = self.token_embs(input_ids) + self.pos_embs(pos_ids) # (N, seq_len, emb_dim)
         input_embs = self.dropout(input_embs) # (N, seq_len, emb_dim)
 

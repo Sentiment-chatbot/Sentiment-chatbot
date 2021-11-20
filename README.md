@@ -1,6 +1,10 @@
 # Sentiment-chatbot
 Team 15; SKKU Artificial Intelligence Project (SWE3032-41)  
-  
+
+## How to use
+At root dir,  
+`python -m src.main`
+
 ## Requirements
 ### Dependencies
 - konlpy==0.5.2

@@ -31,7 +31,7 @@ def main():
         make_dataframe(src_path=args.data_path, dst_path=data_root)
         print("Finish.\n")
     else:
-        print("Processed set exists.")
+        print("Processed set already exists.")
 
     # Loading dataframe
     print("Make dataframe...")
@@ -42,7 +42,7 @@ def main():
     print("Make vocabulary...")
     if not p.exists(p.join(data_root, "/vocab.pkl")):
         print("Vocab preprocessing...")
-        make_vocab(src_dfs=(train_df, valid_df, test_df), dst_path=data_root)
+        make_vocab(src_dfs=(valid_df, test_df), dst_path=data_root)
         print("Finish.")
     vocab = get_vocab(data_root)
     print("Finish.\n")
@@ -59,7 +59,7 @@ def main():
 
     ### train, eval
 
-    print("finish")
+    print("All finished.")
 
 
 if __name__ == '__main__':
