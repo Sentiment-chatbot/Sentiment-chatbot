@@ -30,6 +30,7 @@ class Tokenizer(object):
         ids = []
         for token in tokens:
             ids.append(self.vocab.word2idx[token] if token in self.vocab.word2idx else self.vocab.unk_token_id)
+            ids = [self.vocab[self.vocab.bos_token_id]] + ids + [self.vocab[self.vocab.eos_token_id]]
         return ids
 
     def convert_ids_to_tokens(self, ids):
