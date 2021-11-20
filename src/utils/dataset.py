@@ -1,28 +1,11 @@
 from collections import Counter
+
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
-from utils import get_num_workers
 from konlpy.tag import Mecab
 
-
-
-# class DialogueDataset(Dataset):
-#     def __init__(self, X, E, tokenizer, max_length=40):
-#         super().__init__()
-#         self.X = tokenizer(X.iloc[:, 0].to_list(), max_length=max_length)
-#         self.y = tokenizer(X.iloc[:, 1].to_list(), max_length=max_length)
-#         self.E = E
-
-#     def __getitem__(self, idx):
-#         x = torch.tensor(self.X[idx])
-#         y = torch.tensor(self.y[idx])
-#         e = torch.tensor(self.E[idx])
-#         return x, y, e
-
-#     def __len__(self):
-#         return len(self.X)
-
+from .utils import get_num_workers
 
 
 class Vocabulary(object):
@@ -42,8 +25,6 @@ class Vocabulary(object):
         self.bos_token_id = self.word2idx["<s>"]
         self.eos_token_id = self.word2idx["</s>"]
         self.unk_token_id = self.word2idx["<unk>"]
-
-        
 
     def add_word(self, word):
         if not word in self.word2idx:
