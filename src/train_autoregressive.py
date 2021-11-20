@@ -33,7 +33,7 @@ def valLoss(valid_loader):
             # run model on the valid set to print out logits
             logits = model(inputs)
             
-            all_logits = logits[:,:-1].contiguous()
+            all_logits = logits[:,:-1].transpose(1,2).contiguous()
             target = inputs[:,1:].contiguous()
             
             loss = criterion(all_logits, target[:,:])
@@ -70,7 +70,7 @@ def train(n_epochs, train_loader, valid_loader):
             
             logits = model(inputs)
             
-            all_logits = logits[:,:-1].contiguous()
+            all_logits = logits[:,:-1].transpose(1,2).contiguous()
             target = inputs[:,1:].contiguous()
             
             loss = criterion(all_logits, target[:,:])
