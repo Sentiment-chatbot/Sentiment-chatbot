@@ -5,97 +5,76 @@ import torch
 from torch.utils.data import Dataset, DataLoader, TensorDataset
 from torch.nn.utils.rnn import pad_sequence
 from soynlp.tokenizer import LTokenizer
-
+from .utils import get_num_workers
 from .tokenizer import Tokenizer
 
 
 def tokenize_data(df, vocab):
-    sentiment_dict = {"기쁨": 0, "당황":1, "상처":2, "슬픔":3, "불안":4, "분노":5}
+    emotion_1_dict = {"기쁨": 0, "당황":1, "상처":2, "슬픔":3, "불안":4, "분노":5}
+    emotion_2_dict = {'분노':0, '툴툴대는':1, '좌절한':2, '짜증내는':3, '방어적인':4, '악의적인':5, '안달하는':6, '구역질 나는':7, '노여워하는':8, '성가신':9, '슬픔':10, '실망한':11, '비통한':12,
+                        '후회되는':13, '우울한':14, '마비된':15, '염세적인':16, '눈물이 나는':17, '낙담한':18, '환멸을 느끼는':19, '불안':20, '두려운':21, '스트레스 받는':22, '취약한':23, '혼란스러운':24,
+                        '회의적인':25, '걱정스러운':26, '조심스러운':27, '초조한':28, '상처':29, '질투하는':30, '배신당한':31, '고립된':32, '충격 받은':33, '가난한':34, '불우한':35, '희생된':36, '억울한':37,
+                        '괴로워하는':38, '버려진':39, '당황':40, '고립된(당황한)':41, '남의 시선을 의식하는':42, '외로운':43, '열등감':44, '죄책감의':45, '부끄러운':46, '혐오스러운':47, '한심한':48, '혼란스러운(당황한)':49,
+                        '기쁨':50, '감사하는':51, '신뢰하는':52, '편안한':53, '만족스러운':54, '흥분':55, '느긋':56, '안도':57, '신이 난':58, '자신하는':59, '당혹스러운':60}
+
+    df = df.replace({'emotion_1', emotion_1_dict})
+    df = df.replace({'emotion_2', emotion_2_dict})
+
     input_data = []
     output_data = []    
-    sentiment = []
+    emotion_1 = []
+    emotion_2 = []
     tokenizer = Tokenizer()
-
     
-    for i, row in df.iterrows():
-        q1 = row["q1"]
-        q2 = row["q2"]
-        q3 = row["q3"]
-        q4 = row["q4"]
-        a1 = row["a1"]
-        a2 = row["a2"]
-        a3 = row["a3"]
-        a4 = row["a4"]
-        label = row["emotion_1"]
+    q = tokenizer.encode(df.q)
+    a = tokenizer.encode(df.a)
 
-        if(q1 != ""):
-            q1 = tokenizer.encode(q1)
-            a1 = tokenizer.encode(a1)
-            q1_ids = [vocab[vocab.bos_token_id]] + q1 + [vocab[vocab.eos_token_id]]
-            a1_ids = [vocab[vocab.bos_token_id]] + a1 + [vocab[vocab.eos_token_id]]
-            
-            input_data.append(torch.tensor(q1_ids))
-            output_data.append(torch.tensor(a1_ids))
-            sentiment.append(sentiment_dict[label])
-        
-        if(q2 != ""):
-            q2 = tokenizer.encode(q2)
-            a2 = tokenizer.encode(a2)
-            q2_ids = [vocab[vocab.bos_token_id]] + q2 + [vocab[vocab.eos_token_id]]
-            a2_ids = [vocab[vocab.bos_token_id]] + a2 + [vocab[vocab.eos_token_id]]
-            
-            input_data.append(torch.tensor(q2_ids))
-            output_data.append(torch.tensor(a2_ids))
-            sentiment.append(sentiment_dict[label])
-
-        if(q3 != ""):   
-            q3 = tokenizer.encode(q3)
-            a3 = tokenizer.encode(a3)
-            q3_ids = [vocab[vocab.bos_token_id]] + q3 + [vocab[vocab.eos_token_id]]
-            a3_ids = [vocab[vocab.bos_token_id]] + a3 + [vocab[vocab.eos_token_id]]
-            
-            input_data.append(torch.tensor(q3_ids))
-            output_data.append(torch.tensor(a3_ids))
-            sentiment.append(sentiment_dict[label])
-
-        if(q4 != ""):
-            q4 = tokenizer.encode(q4)
-            a4 = tokenizer.encode(a4)
-            q4_ids = [vocab[vocab.bos_token_id]] + q4 + [vocab[vocab.eos_token_id]]
-            a4_ids = [vocab[vocab.bos_token_id]] + a4 + [vocab[vocab.eos_token_id]]
-
-            input_data.append(torch.tensor(q4_ids))
-            output_data.append(torch.tensor(a4_ids))
-            sentiment.append(sentiment_dict[label])
-
+    input_data.append(torch.tensor(q))
+    output_data.append(torch.tensor(a))
     
-    input_data = pad_sequence(input_data, padding_value=vocab.pad_token_id)
-    output_data = pad_sequence(output_data, padding_value=vocab.pad_token_id)
-    
-    sentiment = torch.tensor(sentiment)
+    emotion_1 = torch.tensor(df.emotion_1)
+    emotion_2 = torch.tensor(df.emotion_2)
 
-    dataset = TensorDataset(input_data, output_data, sentiment)
+    dataset = TensorDataset(input_data, output_data, emotion_1, emotion_2)
     
     return dataset
 
 
-def get_data_loaders(train_data, valid_data, test_data, batch_size, shuffle=False):
+class Collate(object):
+  def __init__(self, pad_token_id):
+    self.pad_token_id = pad_token_id
+  
+  def __call__(self, data):
+    print(data)
+    x, y, e1, e2 = data
+    x = pad_sequence(x, batch_first=True, padding_value=self.pad_token_id).long()
+    y = pad_sequence(y, batch_first=True, padding_value=self.pad_token_id).long()
+    e1 = torch.stack(e1, dim=0)
+    e2 = torch.stack(e2, dim=0)
+
+    return x, y, e1, e2
+
+
+def get_data_loaders(train_data, valid_data, test_data, vocab, batch_size, shuffle=False):
     train_loader = DataLoader(
         train_data,
         num_workers=get_num_workers(),
-        batch_size=batch_size
+        batch_size=batch_size,
+        collate_fn=Collate(pad_token_id=vocab.pad_token_id)
     )
 
     val_loader = DataLoader(
         valid_data,
         num_workers=get_num_workers(),
-        batch_size=batch_size
+        batch_size=batch_size,
+        collate_fn=Collate(pad_token_id=vocab.pad_token_id)
     )
 
     test_loader = DataLoader(
         test_data,
         num_workers=get_num_workers(),
-        batch_size=batch_size
+        batch_size=batch_size,
+        collate_fn=Collate(pad_token_id=vocab.pad_token_id)
     )
 
     return train_loader, val_loader, test_loader

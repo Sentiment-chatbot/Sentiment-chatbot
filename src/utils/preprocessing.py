@@ -16,7 +16,7 @@ def load_emotion_df(xls_path):
         - Simple pre-processing
     """
 
-    df = pd.read_excel(xls_path).fillna("")
+    df = pd.read_excel(xls_path)
 
     df = df.rename(columns={
         "감정_대분류": "emotion_1",
