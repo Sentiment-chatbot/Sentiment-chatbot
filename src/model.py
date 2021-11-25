@@ -14,8 +14,9 @@ class Attention(nn.Module):
         self,
         emb_dim,
         max_seq_len,
-        num_heads=12,
-        dropout=0.1
+        num_heads,
+        dropout,
+        device
     ):
         super().__init__()
         self.emb_dim = emb_dim
@@ -37,6 +38,8 @@ class Attention(nn.Module):
         self.fc = nn.Linear(in_features=emb_dim, out_features=emb_dim)
 
         self.dropout = nn.Dropout(p=dropout)
+
+        self.device=device
 
     def split_heads(self, x):
         """
@@ -109,7 +112,7 @@ class Attention(nn.Module):
 
 class FeedForward(nn.Module):
     """ Feed-forward layer of decoder(Transformer) module """
-    def __init__(self, emb_dim=768, dropout=0.1):
+    def __init__(self, emb_dim, dropout):
         super().__init__()
         inner_state_dim = emb_dim * 4
 
@@ -135,8 +138,8 @@ class Decoder(nn.Module):
         self,
         emb_dim,
         max_seq_len,
-        num_heads=12,
-        dropout=0.1
+        num_heads,
+        dropout
     ):
         super().__init__()
         self.attention = Attention(
@@ -152,14 +155,14 @@ class Decoder(nn.Module):
         self.layer_norm1 = LayerNorm(normalized_shape=emb_dim, eps=1e-5)
         self.layer_norm2 = LayerNorm(normalized_shape=emb_dim, eps=1e-5)
 
-    def forward(self, x, attention_mask): 
+    def forward(self, x, attention_mask=None):
         """
         Args:
             x:(N, seq_len, emb_dim)
             attention_mask:(N, 1, 1, seq_len)
         """
-        x += self.attention(self.layer_norm1(x), attention_mask) # (N, seq_len, emb_dim)
-        x += self.feedforward(self.layer_norm2(x)) # (N, seq_len, emb_dim)
+        x = x + self.attention(self.layer_norm1(x), attention_mask) # (N, seq_len, emb_dim)
+        x = x + self.feedforward(self.layer_norm2(x)) # (N, seq_len, emb_dim)
 
         return x # (N, seq_len, emb_dim)
 
@@ -173,10 +176,10 @@ class GPT2Model(nn.Module):
         vocab_size,
         emb_dim,
         max_seq_len,
-        num_heads=12,
-        num_layers=12,
-        dropout=0.1,
-        device=None
+        num_heads,
+        num_layers,
+        dropout,
+        device
     ):
         super().__init__()
         self.token_embs = nn.Embedding(vocab_size, emb_dim)
