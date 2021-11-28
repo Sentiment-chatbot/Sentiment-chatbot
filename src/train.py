@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 
-def save_ckpt(ckpt_path, step, train_loss, valid_loss):
+def save_ckpt(ckpt_path, epoch, train_loss, valid_loss):
     torch.save({
         "epoch": epoch,
         "model_state_dict" : model.state_dict(),
