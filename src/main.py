@@ -76,7 +76,7 @@ def main():
     print("Get model...")
     model = GPT2Model(**GPT2DefaultConfig, vocab_size=len(vocab), device=device)
 
-    # print("Start train.")
+    print("Start train.")
     train(
         model=model,
         train_loader=train_loader,
