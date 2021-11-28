@@ -5,7 +5,7 @@ import torch
 
 from .model import GPT2Model
 from .option import GPT2DefaultConfig, get_arg_parser
-from .train_autoregressive import train
+from .train import train
 from .utils import set_seed
 from .utils.tokenizer import Tokenizer
 from .utils.preprocessing import (
@@ -76,7 +76,14 @@ def main():
     model = GPT2Model(**GPT2DefaultConfig, vocab_size=len(vocab), device=device)
 
     print("Start train.")
-    train(model, train_loader, n_epochs=args.n_epochs, device=device, logging_step=1)
+    train(
+        model=model,
+        train_loader=train_loader,
+        valid_loader=valid_loader,
+        n_epochs=args.n_epochs,
+        device=device,
+        logging_step=100
+    )
     print("All finished.")
 
 
