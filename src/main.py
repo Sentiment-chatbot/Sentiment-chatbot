@@ -15,6 +15,7 @@ from .utils.preprocessing import (
     get_vocab
 )
 from .utils.dataset import DialogueDataset, load_data_loader
+from .utils.generate import generate
 
 
 def main():
@@ -75,15 +76,30 @@ def main():
     print("Get model...")
     model = GPT2Model(**GPT2DefaultConfig, vocab_size=len(vocab), device=device)
 
-    print("Start train.")
+    # print("Start train.")
     train(
         model=model,
         train_loader=train_loader,
         valid_loader=valid_loader,
         n_epochs=args.n_epochs,
         device=device,
-        logging_step=100
+        logging_step=300
     )
+    print("Finish. \n")
+    
+    print("Start generation.")
+    response_sentence = generate(
+        "나 요즘 너무 우울해.",
+        max_seq_len=20,
+        model=model,
+        tokenizer=tokenizer,
+        gen_policy=args.gen_policy,
+        device=device
+    )
+    print("입력: 나 요즘 너무 우울해.")
+    print(f"출력: {response_sentence}")
+    print("Finish. \n")
+
     print("All finished.")
 
 

@@ -21,7 +21,9 @@ def get_arg_parser():
     parser.add_argument('--data-path', '-r', type=str, default="data/",
                         help='Data path')
     parser.add_argument('--base-tokenizer', '-bt', type=str, default="Ltokenizer",
-                        help='Option: Ltokenizer, Mecab')
+                        help='Tokenizer type, option: Ltokenizer, Mecab')
+    parser.add_argument('--gen-policy', '-gp', type=str, default="greedy",
+                        help='Teneration policy, option: greedy, beam, topk')
 
     return parser
 

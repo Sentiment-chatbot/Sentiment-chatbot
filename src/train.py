@@ -71,6 +71,7 @@ def train(
     for epoch in range(n_epochs):
         epoch_loss = []
         for step, inputs in enumerate(train_loader):
+            model.train()
             x, _, _ = inputs # x: (N, max_seq_len)
             y = x[:, 1:].contiguous()
             x, y = x.to(device), y.to(device)
@@ -91,8 +92,8 @@ def train(
             if (step + 1) % logging_step == 0:
                 print(f"[Epoch {epoch + 1}/{n_epochs}] Step {step  + 1}/{len(train_loader)} | loss: {np.mean(epoch_loss):.3f}")
                 
-            train_loss.append(np.mean(epoch_loss))
-            valid_loss = validate(model, valid_loader, device)
+        train_loss.append(np.mean(epoch_loss))
+        valid_loss = validate(model, valid_loader, device)
         
         if valid_loss < best_loss:
             best_loss = valid_loss
