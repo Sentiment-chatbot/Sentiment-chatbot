@@ -38,3 +38,22 @@ class Tokenizer(object):
 
     def convert_ids_to_sentence(self, ids):
         return ' '.join(self.vocab.convert_ids_to_tokens(ids))
+
+
+class ngram_Tokenizer(object):
+    def __init__(self ,n):
+        self.tokenizer = LTokenizer
+        self.n = n
+
+    def n_gram_encode(self, sentence):
+        tokens = self.tokenizer.tokenize(sentence)
+        return self.convert_ngram_tokens(tokens)
+    
+    def convert_ngram_tokens(self, tokens):
+        n_gram_tokens = []
+        for i in len(tokens) - (self.n-1):
+            n_token = None
+            for j in range(self.n):
+                n_token += tokens[i+j]
+            n_gram_tokens.append(n_token)
+        return n_gram_tokens
