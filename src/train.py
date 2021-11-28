@@ -1,9 +1,12 @@
+import os
+import os.path as p
+
 import numpy as np
 import torch
 import torch.nn as nn
 
 
-def save_ckpt(ckpt_path, epoch, train_loss, valid_loss):
+def save_ckpt(ckpt_path, model, epoch, train_loss, valid_loss):
     torch.save({
         "epoch": epoch,
         "model_state_dict" : model.state_dict(),
@@ -97,4 +100,8 @@ def train(
         
         if valid_loss < best_loss:
             best_loss = valid_loss
-            save_ckpt(ckpt_path, epoch, train_loss, best_loss) 
+            save_ckpt(
+                ckpt_path=p.join(ckpt_path, f"checkpoint_epoch_{epoch + 1}.pt"), 
+                model=model, epoch=epoch + 1, 
+                train_loss=train_loss, best_loss=best_loss
+            )
