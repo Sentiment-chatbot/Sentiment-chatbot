@@ -40,7 +40,7 @@ class Tokenizer(object):
         return ' '.join(self.vocab.convert_ids_to_tokens(ids))
 
 
-class ngram_Tokenizer(object):
+class NgramTokenizer(object):
     def __init__(self ,n):
         self.tokenizer = LTokenizer
         self.n = n
