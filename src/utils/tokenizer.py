@@ -2,9 +2,12 @@ from soynlp.tokenizer import LTokenizer
 
 
 class Tokenizer(object):
-    def __init__(self, vocab):
+    def __init__(self, vocab, base_tokenizer):
         self.vocab = vocab
-        self.tokenizer = LTokenizer
+        if base_tokenizer == "Ltokenizer":
+            self.base_tokenizer = LTokenizer()
+        else:
+            raise NotImplementedError
 
     def __call__(self, x, max_length=None):
         tokens = None
@@ -19,9 +22,19 @@ class Tokenizer(object):
 
         return tokens
 
-    def encode(self, sentence): # Encode words for only single sentence
-        tokens = self.tokenizer.tokenize(sentence)
-        return self.convert_tokens_to_ids(tokens)
+    def encode(self, raw):
+        tokens = None
+        if isinstance(raw, list):
+            token_list = []
+            for sentence in raw:
+                tokens = self.base_tokenizer.tokenize(sentence)
+                token_list.append(self.convert_tokens_to_ids(tokens))
+            return token_list
+        elif isinstance(raw, str):
+            tokens = self.base_tokenizer.tokenize(raw)
+            return self.convert_tokens_to_ids(tokens)
+        else:
+            raise NotImplementedError
 
     def decode(self, ids): # Decode ids for only single sentence
         return self.convert_ids_to_sentence(ids)
@@ -29,15 +42,17 @@ class Tokenizer(object):
     def convert_tokens_to_ids(self, tokens):
         ids = []
         for token in tokens:
-            ids.append(self.vocab.word2idx[token] if token in self.vocab.word2idx else self.vocab.unk_token_id)
-            ids = [self.vocab[self.vocab.bos_token_id]] + ids + [self.vocab[self.vocab.eos_token_id]]
+            ids.append(
+                self.vocab.word2idx[token] if token in self.vocab.word2idx 
+                                           else self.vocab.unk_token_id
+            )
         return ids
 
     def convert_ids_to_tokens(self, ids):
         return [self.vocab.idx2word[id] for id in ids]
 
     def convert_ids_to_sentence(self, ids):
-        return ' '.join(self.vocab.convert_ids_to_tokens(ids))
+        return ' '.join(self.convert_ids_to_tokens(ids))
 
 
 class NgramTokenizer(object):

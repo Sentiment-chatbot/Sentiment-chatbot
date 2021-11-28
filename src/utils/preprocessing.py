@@ -78,18 +78,18 @@ def get_dataframe(src_path):
 
     return dfs
 
-def make_vocab(src_dfs, dst_path):
-    vocabulary = Vocabulary()
+def make_vocab(base_tokenizer, src_dfs, dst_path):
+    vocabulary = Vocabulary(base_tokenizer)
 
     for df in src_dfs:
-        vocabulary.make_vocab(df)
+        vocabulary.add_df(df)
 
-    with open(p.join(dst_path, "vocab.pkl"), "wb") as f:
+    with open(p.join(dst_path, f"vocab_{base_tokenizer}.pkl"), "wb") as f:
         pickle.dump(vocabulary, f)
 
-def get_vocab(src_path):
+def get_vocab(base_tokenizer, src_path):
     vocab = None
-    with open(p.join(src_path, "vocab.pkl"), "rb") as f:
+    with open(p.join(src_path, f"vocab_{base_tokenizer}.pkl"), "rb") as f:
         vocab = pickle.load(f)
 
     return vocab

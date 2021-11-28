@@ -139,14 +139,16 @@ class Decoder(nn.Module):
         emb_dim,
         max_seq_len,
         num_heads,
-        dropout
+        dropout,
+        device
     ):
         super().__init__()
         self.attention = Attention(
             emb_dim=emb_dim,
             max_seq_len=max_seq_len,
             num_heads=num_heads,
-            dropout=dropout
+            dropout=dropout,
+            device=device
         )
         self.feedforward = FeedForward(
             emb_dim=emb_dim,
@@ -191,7 +193,8 @@ class GPT2Model(nn.Module):
                 emb_dim=emb_dim,
                 max_seq_len=max_seq_len,
                 num_heads=num_heads,
-                dropout=dropout
+                dropout=dropout,
+                device=device
             ) for _ in range(num_layers)
         )
         self.layer_norm = LayerNorm(normalized_shape=emb_dim, eps=1e-5)

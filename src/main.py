@@ -1,15 +1,20 @@
 import os
 import os.path as p
 
+import torch
+
 from .model import GPT2Model
+from .option import GPT2DefaultConfig, get_arg_parser
+from .train_autoregressive import train
 from .utils import set_seed
+from .utils.tokenizer import Tokenizer
 from .utils.preprocessing import (
     make_dataframe,
     get_dataframe,
     make_vocab,
     get_vocab
 )
-from .option import get_arg_parser
+from .utils.dataset import DialogueDataset, load_data_loader
 
 
 def main():
@@ -39,30 +44,43 @@ def main():
     print("Finish.\n")
 
     # Loading vocabulary
-    print("Make vocabulary...")
-    if not p.exists(p.join(data_root, "/vocab.pkl")):
+    print("Make vocabulary & tokenizer...")
+    if not p.exists(p.join(data_root, f"vocab_{args.base_tokenizer}.pkl")):
         print("Vocab preprocessing...")
-        make_vocab(src_dfs=(valid_df, test_df), dst_path=data_root)
+        make_vocab(
+            args.base_tokenizer,
+            src_dfs=(train_df, valid_df),
+            dst_path=data_root
+        )
         print("Finish.")
-    vocab = get_vocab(data_root)
-    print("Finish.\n")
+    vocab = get_vocab(args.base_tokenizer, data_root)
+    tokenizer = Tokenizer(vocab, args.base_tokenizer)
+    print(f"Finish. Vocabulary size: {len(vocab)}\n")
 
-    # train_ds, valid_ds, test_ds = map(
-    #     lambda df: load_dataset(df), (train_df, valid_df, test_df)
-    # )
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")    
+    print(f"Running on {device}.")
 
-    # train_loader = DataLoader(train_ds, shuffle=True, batch_size=args.batch_size)
-    # valid_loader = DataLoader(train_ds, shuffle=True, batch_size=args.batch_size)
-    # test_loader = DataLoader(train_ds, shuffle=True, batch_size=args.batch_size)
+    print("Load datasets...")
+    train_ds = DialogueDataset(train_df, vocab, tokenizer)
+    valid_ds = DialogueDataset(valid_df, vocab, tokenizer)
+    test_ds = DialogueDataset(test_df, vocab, tokenizer)
+    print("Finish. \n")
+    
+    print("Load dataloaders...")
+    train_loader = load_data_loader(train_ds, vocab.pad_token_id, args.batch_size, shuffle=True)
+    valid_loader = load_data_loader(valid_ds, vocab.pad_token_id, args.batch_size)
+    test_loader = load_data_loader(test_ds, vocab.pad_token_id, args.batch_size)
+    print("Finish. \n")
 
-    # model = GPT2Model()
+    print("Get model...")
+    model = GPT2Model(**GPT2DefaultConfig, vocab_size=len(vocab), device=device)
 
-    ### train, eval
-
+    print("Start train.")
+    train(model, train_loader, n_epochs=args.n_epochs, device=device, logging_step=1)
     print("All finished.")
 
 
 if __name__ == '__main__':
     main()
 
-#### python3 main.py --seed 42 --batch_size 64 --epoch 1 --learning-rate 1e-4
+#### python -m src.main --seed 42 --batch_size 64 --epoch 1 --learning-rate 1e-4

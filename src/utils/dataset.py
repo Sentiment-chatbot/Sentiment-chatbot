@@ -10,93 +10,29 @@ from .utils import get_num_workers
 from .tokenizer import Tokenizer
 
 
-def tokenize_data(df, vocab):
-    emotion_1_dict = {"기쁨": 0, "당황":1, "상처":2, "슬픔":3, "불안":4, "분노":5}
-    emotion_2_dict = {'분노':0, '툴툴대는':1, '좌절한':2, '짜증내는':3, '방어적인':4, '악의적인':5, '안달하는':6, '구역질 나는':7, '노여워하는':8, '성가신':9, '슬픔':10, '실망한':11, '비통한':12,
-                        '후회되는':13, '우울한':14, '마비된':15, '염세적인':16, '눈물이 나는':17, '낙담한':18, '환멸을 느끼는':19, '불안':20, '두려운':21, '스트레스 받는':22, '취약한':23, '혼란스러운':24,
-                        '회의적인':25, '걱정스러운':26, '조심스러운':27, '초조한':28, '상처':29, '질투하는':30, '배신당한':31, '고립된':32, '충격 받은':33, '가난한':34, '불우한':35, '희생된':36, '억울한':37,
-                        '괴로워하는':38, '버려진':39, '당황':40, '고립된(당황한)':41, '남의 시선을 의식하는':42, '외로운':43, '열등감':44, '죄책감의':45, '부끄러운':46, '혐오스러운':47, '한심한':48, '혼란스러운(당황한)':49,
-                        '기쁨':50, '감사하는':51, '신뢰하는':52, '편안한':53, '만족스러운':54, '흥분':55, '느긋':56, '안도':57, '신이 난':58, '자신하는':59, '당혹스러운':60}
-
-    df = df.replace({'emotion_1', emotion_1_dict})
-    df = df.replace({'emotion_2', emotion_2_dict})
-
-    input_data = []
-    output_data = []    
-    emotion_1 = []
-    emotion_2 = []
-    tokenizer = Tokenizer()
-    
-    q = tokenizer.encode(df.q)
-    a = tokenizer.encode(df.a)
-
-    input_data.append(torch.tensor(q))
-    output_data.append(torch.tensor(a))
-    
-    emotion_1 = torch.tensor(df.emotion_1)
-    emotion_2 = torch.tensor(df.emotion_2)
-
-    dataset = TensorDataset(input_data, output_data, emotion_1, emotion_2)
-    
-    return dataset
-
-
-class Collate(object):
-  def __init__(self, pad_token_id):
-    self.pad_token_id = pad_token_id
-  
-  def __call__(self, data):
-    print(data)
-    x, y, e1, e2 = data
-    x = pad_sequence(x, batch_first=True, padding_value=self.pad_token_id).long()
-    y = pad_sequence(y, batch_first=True, padding_value=self.pad_token_id).long()
-    e1 = torch.stack(e1, dim=0)
-    e2 = torch.stack(e2, dim=0)
-
-    return x, y, e1, e2
-
-
-def get_data_loaders(train_data, valid_data, test_data, vocab, batch_size, shuffle=False):
-    train_loader = DataLoader(
-        train_data,
-        num_workers=get_num_workers(),
-        batch_size=batch_size,
-        collate_fn=Collate(pad_token_id=vocab.pad_token_id)
-    )
-
-    val_loader = DataLoader(
-        valid_data,
-        num_workers=get_num_workers(),
-        batch_size=batch_size,
-        collate_fn=Collate(pad_token_id=vocab.pad_token_id)
-    )
-
-    test_loader = DataLoader(
-        test_data,
-        num_workers=get_num_workers(),
-        batch_size=batch_size,
-        collate_fn=Collate(pad_token_id=vocab.pad_token_id)
-    )
-
-    return train_loader, val_loader, test_loader
-
-
 class Vocabulary(object):
-    def __init__(self):
+    def __init__(self, base_tokenizer):
         self.word2idx = {}
         self.idx2word = {}
         self.idx = 0
-        self.tokenizer = LTokenizer()
 
-        self.add_word("<pad>")
+        if base_tokenizer == "Ltokenizer":
+            self.base_tokenizer = LTokenizer()
+        else:
+            raise NotImplementedError
+
         self.add_word("<s>")
         self.add_word("</s>")
         self.add_word("<unk>")
+        self.add_word("<sp1>")
+        self.add_word("<sp2>")
 
-        self.pad_token_id = self.word2idx["<pad>"]
         self.bos_token_id = self.word2idx["<s>"]
         self.eos_token_id = self.word2idx["</s>"]
+        self.pad_token_id = self.word2idx["</s>"]
         self.unk_token_id = self.word2idx["<unk>"]
+        self.sp1_token_id = self.word2idx["<sp1>"]
+        self.sp2_token_id = self.word2idx["<sp2>"]
 
     def add_word(self, word):
         if not word in self.word2idx:
@@ -114,9 +50,9 @@ class Vocabulary(object):
             if cnt >= threshold:
                 self.add_word(word)
 
-    def make_vocab(self, df):
-        self.add_sequence(df['q'].to_list())
-        self.add_sequence(df['a'].to_list())
+    def add_df(self, df):
+        self.add_sequence(df['q'].tolist())
+        self.add_sequence(df['a'].tolist())
 
     def __call__(self, word):
         if not word in self.word2idx:
@@ -128,8 +64,74 @@ class Vocabulary(object):
 
     def tokenize(self, sentence):
         try:
-            tokens = self.tokenizer.tokenize(sentence)
+            tokens = self.base_tokenizer.tokenize(sentence)
         except:
-            print(sentence)
-            assert 0
+            print(f"Fail to tokenize sentence: {sentence}")
+            raise ValueError
+
         return tokens
+
+
+class DialogueDataset(Dataset):
+    def __init__(self, df, vocab, tokenizer):
+        super().__init__()
+        emotion_1_types = df.emotion_1.unique()
+        emotion_1_dict = {name: i for i, name in enumerate(emotion_1_types)}
+        
+        emotion_2_types = df.emotion_2.unique()
+        emotion_2_dict = {name: i for i, name in enumerate(emotion_2_types)}
+
+        df = df.replace({
+            'emotion_1': emotion_1_dict,
+            'emotion_2': emotion_2_dict
+        })
+        
+        self.dialogues = []
+        self.emotion_1 = df.emotion_1.tolist()
+        self.emotion_2 = df.emotion_2.tolist()
+            
+        q_set = tokenizer.encode(df.q.tolist())
+        a_set = tokenizer.encode(df.a.tolist())
+        for q, a in zip(q_set, a_set):
+            ids = [vocab.bos_token_id, vocab.sp1_token_id] + q \
+                    + [vocab.sp2_token_id] + a + [vocab.eos_token_id]
+            self.dialogues.append(ids)
+
+    def __getitem__(self, idx):
+        return (
+            torch.tensor(self.dialogues[idx]),
+            torch.tensor(self.emotion_1[idx]),
+            torch.tensor(self.emotion_2[idx])
+        )
+        
+    def __len__(self):
+        return len(self.dialogues)
+
+
+def load_data_loader(ds, pad_token_id, batch_size, shuffle=False):
+    class Collate(object):
+        def __init__(self, pad_token_id):
+            self.pad_token_id = pad_token_id
+
+        def __call__(self, data):
+            dialogue, emotion_1, emotion_2 = zip(*data)
+            dialogue = pad_sequence(
+                dialogue,
+                batch_first=True,
+                padding_value=self.pad_token_id
+            ).long()
+            emotion_1 = torch.stack(emotion_1, dim=0)
+            emotion_2 = torch.stack(emotion_2, dim=0)
+
+            return dialogue, emotion_1, emotion_2
+
+    num_workers = get_num_workers()
+    data_loader = DataLoader(
+        ds,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        collate_fn=Collate(pad_token_id=pad_token_id)
+    )
+
+    return data_loader
