@@ -7,7 +7,8 @@ At root dir,
 
 ## Requirements
 ### Dependencies
-- konlpy==0.5.2
+- (option 1) konlpy==0.5.2
+- (option 2) soynlp
 
 
 ### KoNLPy  
