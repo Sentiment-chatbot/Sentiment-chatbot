@@ -23,13 +23,14 @@ class Vocabulary(object):
 
         self.add_word("<s>")
         self.add_word("</s>")
+        self.add_word("<pad>")
         self.add_word("<unk>")
         self.add_word("<sp1>")
         self.add_word("<sp2>")
 
         self.bos_token_id = self.word2idx["<s>"]
         self.eos_token_id = self.word2idx["</s>"]
-        self.pad_token_id = self.word2idx["</s>"]
+        self.pad_token_id = self.word2idx["<pad>"]
         self.unk_token_id = self.word2idx["<unk>"]
         self.sp1_token_id = self.word2idx["<sp1>"]
         self.sp2_token_id = self.word2idx["<sp2>"]
