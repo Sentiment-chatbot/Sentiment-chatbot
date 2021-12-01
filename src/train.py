@@ -52,6 +52,7 @@ def train(
     device, 
     opt='adamw',
     learning_rate=3e-4,
+    lr_scheduler='SGDR',
     ckpt_path='./ckpt',
     logging_step=300 
 ):
@@ -67,13 +68,21 @@ def train(
 
     # Make a directory to save the checkpoint weight(s)
     os.makedirs(ckpt_path, exist_ok=True)
-        
+
+    # Loss function
     criterion = nn.CrossEntropyLoss()
+
+    # Optimizer
     optimizer = None
     if opt == 'adamw':
         optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
     else:
         raise NotImplementedError
+
+    # TODO: Learning scheduler
+    # scheduler = None
+    # if scheduler == 'SGDR':
+    #     scheduler = CustomCosineAnnealingWarmRestart(optimizer)
 
     losses = []
     train_loss = []
