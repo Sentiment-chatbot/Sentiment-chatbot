@@ -20,9 +20,8 @@ def validate(model, valid_loader, device):
     criterion = nn.CrossEntropyLoss()
     model.eval()
 
-    losses = []
     with torch.no_grad():
-        epoch_loss = []
+        epoch_loss = 0.0
         for step, inputs in enumerate(valid_loader):
             x, _, _ = inputs # x: (N, max_seq_len)
             y = x[:, 1:].contiguous()
@@ -35,9 +34,9 @@ def validate(model, valid_loader, device):
             target = x[:, 1:].contiguous() # (N, seq_len - 1)
             
             loss = criterion(logits.view(-1, logits.size(-1)), target.view(-1))
-            losses.append(loss.item())
+            epoch_loss += loss.item()
 
-    total_loss = np.mean(losses)
+        total_loss = epoch_loss / len(valid_loader)
     
     return total_loss
 
@@ -81,7 +80,7 @@ def train(
     
     model.to(device)
     for epoch in range(n_epochs):
-        epoch_loss = []
+        epoch_loss = 0.0
         for step, inputs in enumerate(train_loader):
             model.train()
             x, _, _ = inputs # x: (N, max_seq_len)
@@ -99,12 +98,12 @@ def train(
             loss.backward()
             optimizer.step()
             
-            epoch_loss.append(loss.item())
+            epoch_loss += loss.item()
             
             if (step + 1) % logging_step == 0:
-                print(f"[Epoch {epoch + 1}/{n_epochs}] Step {step  + 1}/{len(train_loader)} | loss: {np.mean(epoch_loss):.3f}")
-                
-        train_loss.append(np.mean(epoch_loss))
+                print(f"[Epoch {epoch + 1}/{n_epochs}] Step {step  + 1}/{len(train_loader)} | loss: {epoch_loss/(step + 1): .3f}")
+        
+        train_loss.append(epoch_loss / len(train_loader))
         valid_loss = validate(model, valid_loader, device)
         
         if valid_loss < best_loss:

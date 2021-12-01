@@ -2,7 +2,7 @@ from collections import Counter
 
 import pandas as pd
 import torch
-from torch.utils.data import Dataset, DataLoader, TensorDataset
+from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from soynlp.tokenizer import LTokenizer
 
@@ -90,7 +90,7 @@ class DialogueDataset(Dataset):
         self.dialogues = []
         self.emotion_1 = df.emotion_1.tolist()
         self.emotion_2 = df.emotion_2.tolist()
-            
+
         q_set = tokenizer.encode(df.q.tolist())
         a_set = tokenizer.encode(df.a.tolist())
         for q, a in zip(q_set, a_set):

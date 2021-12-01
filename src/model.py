@@ -243,7 +243,7 @@ class GPT2Model(nn.Module):
 
         if attention_mask is not None:
             attention_mask = attention_mask.view(input_ids.size(0), 1, 1, -1) # (N, 1, 1, seq_len)
-            attention_mask = (1.0 - attention_mask) * -10000.0 # (N, 1, 1, seq_len)
+            attention_mask = (1.0 - attention_mask) * -1e4 # (N, 1, 1, seq_len)
 
         logits = input_embs # (N, seq_len, emb_dim)
         for decoder in self.decoders:
