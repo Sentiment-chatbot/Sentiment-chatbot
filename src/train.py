@@ -1,6 +1,7 @@
 import os
 import os.path as p
 
+import wandb
 import numpy as np
 import torch
 import torch.nn as nn
@@ -108,8 +109,14 @@ def train(
             loss.backward()
 
             optimizer.step()
-            
+
             epoch_loss += loss.item()
+
+            # Wandb logging
+            wandb.log({
+                "train_loss": epoch_loss / (step + 1)
+            })
+
             if (step + 1) % logging_step == 0:
                 print(f"[Epoch {epoch + 1}/{n_epochs}] Step {step  + 1}/{len(train_loader)} | loss: {epoch_loss/(step + 1): .3f}")
         

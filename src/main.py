@@ -1,7 +1,9 @@
 import os
 import os.path as p
+from datetime import datetime
 
 import torch
+import wandb
 
 from .model import GPT2Model
 from .option import GPT2DefaultConfig, get_arg_parser
@@ -62,21 +64,34 @@ def main():
     tokenizer = Tokenizer(vocab, args.base_tokenizer)
     print(f"Finish. Vocabulary size: {len(vocab)}\n")
 
+    # Loading dataset
     print("Load datasets...")
     train_ds = DialogueDataset(train_df, vocab, tokenizer)
     valid_ds = DialogueDataset(valid_df, vocab, tokenizer)
     test_ds = DialogueDataset(test_df, vocab, tokenizer)
     print("Finish. \n")
     
+    # Loading dataloader
     print("Load dataloaders...")
     train_loader = load_data_loader(train_ds, vocab.pad_token_id, args.batch_size, shuffle=True)
     valid_loader = load_data_loader(valid_ds, vocab.pad_token_id, args.batch_size)
     test_loader = load_data_loader(test_ds, vocab.pad_token_id, args.batch_size)
     print("Finish. \n")
 
+    # Loading model
     print("Get model...")
     model = GPT2Model(**GPT2DefaultConfig, vocab_size=len(vocab), device=device)
 
+    # Wandb link
+    print("\nWandb initialization")
+    wandb.init(
+        project="Final project",
+        entity="skku-2021-2-ap-team15",
+    )
+    wandb.config.update(args)
+    wandb.run.name = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+    # Start training
     print("Start train.")
     train(
         model=model,
@@ -91,22 +106,8 @@ def main():
         logging_step=args.logging_step,
     )
     print("Finish. \n")
-    
-    # print("Start generation.")
-    # response_sentence = generate(
-    #     "나 요즘 너무 우울해.",
-    #     max_seq_len=20,
-    #     model=model,
-    #     tokenizer=tokenizer,
-    #     gen_policy=args.gen_policy,
-    #     device=device
-    # )
-    # print("입력: 나 요즘 너무 우울해.")
-    # print(f"출력: {response_sentence}")
-    # print("Finish. \n")
 
     print("All finished.")
-
 
 if __name__ == '__main__':
     main()
