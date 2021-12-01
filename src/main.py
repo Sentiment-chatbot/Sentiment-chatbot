@@ -80,26 +80,30 @@ def main():
     print("Start train.")
     train(
         model=model,
+        tokenizer=tokenizer,
         train_loader=train_loader,
         valid_loader=valid_loader,
         n_epochs=args.n_epochs,
+        gen_max_seq_len=20,
+        gen_policy=args.gen_policy,
+        gen_ex_input="나 요즘 너무 우울해.",
         device=device,
-        logging_step=300
+        logging_step=args.logging_step,
     )
     print("Finish. \n")
     
-    print("Start generation.")
-    response_sentence = generate(
-        "나 요즘 너무 우울해.",
-        max_seq_len=20,
-        model=model,
-        tokenizer=tokenizer,
-        gen_policy=args.gen_policy,
-        device=device
-    )
-    print("입력: 나 요즘 너무 우울해.")
-    print(f"출력: {response_sentence}")
-    print("Finish. \n")
+    # print("Start generation.")
+    # response_sentence = generate(
+    #     "나 요즘 너무 우울해.",
+    #     max_seq_len=20,
+    #     model=model,
+    #     tokenizer=tokenizer,
+    #     gen_policy=args.gen_policy,
+    #     device=device
+    # )
+    # print("입력: 나 요즘 너무 우울해.")
+    # print(f"출력: {response_sentence}")
+    # print("Finish. \n")
 
     print("All finished.")
 

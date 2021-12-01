@@ -5,13 +5,15 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from .utils.generate import generate
 
-def save_ckpt(ckpt_path, model, epoch, train_loss, valid_loss):
+
+def save_ckpt(ckpt_path, model, epoch, train_loss, best_loss):
     torch.save({
         "epoch": epoch,
         "model_state_dict" : model.state_dict(),
         "train_loss" : train_loss,
-        "valid_loss" : valid_loss
+        "best_loss" : best_loss
     }, ckpt_path)
     
 def validate(model, valid_loader, device):
@@ -41,15 +43,18 @@ def validate(model, valid_loader, device):
 
 def train(
     model,
+    tokenizer,
     train_loader,
     valid_loader,
     n_epochs,
+    gen_max_seq_len,
+    gen_policy,
+    gen_ex_input,
     device, 
     opt='adamw',
     learning_rate=3e-4,
     ckpt_path='./ckpt',
-    save_every=500,
-    logging_step=30
+    logging_step=300 
 ):
     """ Train with next word prediction
     
@@ -105,3 +110,15 @@ def train(
                 model=model, epoch=epoch + 1, 
                 train_loss=train_loss, best_loss=best_loss
             )
+
+        print(f"[Epoch {epoch + 1}/{n_epochs}] Test generation")
+        print(f"Input: {gen_example}")
+        response_sentence = generate(
+            user_input=gen_ex_input,
+            max_seq_len=gen_max_seq_len,
+            model=model,
+            tokenizer=tokenizer,
+            gen_policy=gen_policy,
+            device=device
+        )
+        print(f"Output: {response_sentence}")
