@@ -79,9 +79,9 @@ def generate(
             logits = model(input_ids).squeeze(0) # (seq_len, vocab_size)
             pred = generate_fn(logits) # single index
             
-            pred_ids.append(pred.item())
             if(pred.item() == tokenizer.vocab.eos_token_id):
                 break
+            pred_ids.append(pred.item())
 
             input_ids = torch.cat((input_ids, pred.view(1, 1)), dim=-1)
 

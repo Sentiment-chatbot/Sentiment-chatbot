@@ -32,7 +32,7 @@ class Attention(nn.Module):
                 1, 1, max_seq_len, max_seq_len
             )
         )
-        self.register_buffer("masking_value", torch.tensor(1e-4))
+        self.register_buffer("masking_value", torch.tensor(-1e4))
 
         self.wqkv = nn.Linear(in_features=emb_dim, out_features=emb_dim * 3)
         self.fc = nn.Linear(in_features=emb_dim, out_features=emb_dim)
