@@ -11,11 +11,11 @@ GPT2DefaultConfig = {
 def get_arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', '-s', type=int, default=42,
-                        help='Set seed')
+                        help='Random seed')
     parser.add_argument('--batch-size', '-b', type=int, default=64,
-                        help='Number of images in each mini-batch')
+                        help='Mini-batch size')
     parser.add_argument('--n-epochs', '-e', type=int, default=100,
-                        help='Number of sweeps over the dataset to train')
+                        help='Number of epochs to train')
     parser.add_argument('--learning-rate', '-lr', type=float, default=1e-4,
                         help='Learning rate')
     parser.add_argument('--data-path', '-r', type=str, default="data/",

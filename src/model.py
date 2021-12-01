@@ -15,8 +15,7 @@ class Attention(nn.Module):
         emb_dim,
         max_seq_len,
         num_heads,
-        dropout,
-        device
+        dropout
     ):
         super().__init__()
         self.emb_dim = emb_dim
@@ -26,20 +25,19 @@ class Attention(nn.Module):
 
         self.max_seq_len = max_seq_len
 
-        # bias is used for making causal attention masks
+        # biases are used for making causal attention masks
         self.register_buffer(
             "bias",
             torch.tril(torch.ones((max_seq_len, max_seq_len), dtype=torch.uint8)).view(
                 1, 1, max_seq_len, max_seq_len
             )
         )
+        self.register_buffer("masking_value", torch.tensor(1e-4))
 
         self.wqkv = nn.Linear(in_features=emb_dim, out_features=emb_dim * 3)
         self.fc = nn.Linear(in_features=emb_dim, out_features=emb_dim)
 
         self.dropout = nn.Dropout(p=dropout)
-
-        self.device=device
 
     def split_heads(self, x):
         """
@@ -81,9 +79,9 @@ class Attention(nn.Module):
         )  # (N, num_heads, seq_len, seq_len)
         
         # Masked self-attention
-        causal_mask = self.bias[:, :, q.size(-2), q.size(-2)].bool()
-        scores = torch.where(causal_mask, scores, torch.tensor(-1e4, device=self.device))
-        
+        causal_mask = self.bias[:, :, :q.size(-2), :q.size(-2)].bool()
+        scores = torch.where(causal_mask, scores, self.masking_value)
+
         if attention_mask is not None:
             scores += attention_mask # broadcasting => (N, num_heads, seq_len, seq_len)
         scores = nn.Softmax(dim=-1)(scores) # (N, num_heads, seq_len, seq_len)
@@ -139,16 +137,14 @@ class Decoder(nn.Module):
         emb_dim,
         max_seq_len,
         num_heads,
-        dropout,
-        device
+        dropout
     ):
         super().__init__()
         self.attention = Attention(
             emb_dim=emb_dim,
             max_seq_len=max_seq_len,
             num_heads=num_heads,
-            dropout=dropout,
-            device=device
+            dropout=dropout
         )
         self.feedforward = FeedForward(
             emb_dim=emb_dim,
@@ -193,8 +189,7 @@ class GPT2Model(nn.Module):
                 emb_dim=emb_dim,
                 max_seq_len=max_seq_len,
                 num_heads=num_heads,
-                dropout=dropout,
-                device=device
+                dropout=dropout
             ) for _ in range(num_layers)
         )
         self.layer_norm = LayerNorm(normalized_shape=emb_dim, eps=1e-5)

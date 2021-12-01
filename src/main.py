@@ -22,6 +22,10 @@ def main():
     parser = get_arg_parser()
     args = parser.parse_args()
 
+    # Set device
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print(f"-- Running on {device}. -- ")
+
     # Set seed
     set_seed(args.seed)
 
@@ -57,9 +61,6 @@ def main():
     vocab = get_vocab(args.base_tokenizer, data_root)
     tokenizer = Tokenizer(vocab, args.base_tokenizer)
     print(f"Finish. Vocabulary size: {len(vocab)}\n")
-
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")    
-    print(f"Running on {device}.")
 
     print("Load datasets...")
     train_ds = DialogueDataset(train_df, vocab, tokenizer)
