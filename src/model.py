@@ -205,17 +205,17 @@ class GPT2Model(nn.Module):
     def set_input_embeddings(self, embeddings):
         self.token_embs = embeddings
 
-    def forward(self, input_ids, attention_mask=None):
+    def forward(self, input_ids, attention_ids=None):
         """
         Arg:
             input_ids: (N, seq_len)
-            attention_mask: (N, seq_len)
+            attention_ids: (N, seq_len)
 
             Example 1) Single sentence
                 tokenizer("날씨가 굉장히 화창하네?")
                 input_ids: 
                     [34018, 40052, 8168, 8811, 9192, 8344, 8702, 7098, 406]
-                attention_mask:
+                attention_ids:
                     [1, 1, 1, 1, 1, 1, 1, 1, 1]
                 decoded:
                     '▁날씨가', '▁굉', '장', '히', '▁화', '창', '하', '네', '?'
@@ -226,7 +226,7 @@ class GPT2Model(nn.Module):
                     [34018, 40052, 8168, 8811, 9192, 8344, 8702, 7098, 406],
                     [29205, 11928, 7098, 25856, 3, 3, 3, 3, 3]
                 ]
-                attention_mask: [
+                attention_ids: [
                     [1, 1, 1, 1, 1, 1, 1, 1, 1],
                     [1, 1, 1, 1, 0, 0, 0, 0, 0]
                 ]
@@ -236,14 +236,15 @@ class GPT2Model(nn.Module):
         Return:
             logits: (N, seq_len, vocab_size)
             Each of the logits indicate a confidence of each word for each position
-        """        
+        """
         pos_ids = torch.arange(0, input_ids.size(-1), device=self.device).unsqueeze(0) # (1, seq_len)
         input_embs = self.token_embs(input_ids) + self.pos_embs(pos_ids) # (N, seq_len, emb_dim)
         input_embs = self.dropout(input_embs) # (N, seq_len, emb_dim)
 
-        if attention_mask is not None:
-            attention_mask = attention_mask.view(input_ids.size(0), 1, 1, -1) # (N, 1, 1, seq_len)
-            attention_mask = (1.0 - attention_mask) * -1e4 # (N, 1, 1, seq_len)
+        attention_mask = None
+        if attention_ids is not None:
+            attention_ids = attention_ids.view(input_ids.size(0), 1, 1, -1) # (N, 1, 1, seq_len)
+            attention_mask = (1.0 - attention_ids) * -1e4 # (N, 1, 1, seq_len)
 
         logits = input_embs # (N, seq_len, emb_dim)
         for decoder in self.decoders:

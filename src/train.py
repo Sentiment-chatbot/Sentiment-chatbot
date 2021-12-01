@@ -22,22 +22,22 @@ def validate(model, valid_loader, device):
 
     with torch.no_grad():
         epoch_loss = 0.0
-        for step, inputs in enumerate(valid_loader):
-            x, _, _ = inputs # x: (N, max_seq_len)
-            y = x[:, 1:].contiguous()
-            x, y = x.to(device), y.to(device)
-            # x: (batched) <s> <sp1> {sentence1} <sp2> {sentence2} </s>
-            # _: emotion label
+        for step, (input_ids, attention_ids, *_) in enumerate(valid_loader):
+            # input_ids: (batched) <s> <sp1> {sentence1} <sp2> {sentence2} </s>
+            # attention_ids: [1, 1, 1, 1, 1, ..., 0, 0]
+            # Other(*_): emotion labels
+            input_ids, attention_ids = input_ids.to(device), attention_ids.to(device) # (N, max_seq_len)
+            labels = input_ids[:, 1:].contiguous() # labels: (N, seq_len - 1)
 
-            logits = model(x) # (N, seq_len, vocab_size)
+            logits = model(input_ids=input_ids, attention_ids=attention_ids) # (N, seq_len, vocab_size)
             logits = logits[:, :-1, :].contiguous() # (N, seq_len - 1, vocab_size)
-            target = x[:, 1:].contiguous() # (N, seq_len - 1)
             
-            loss = criterion(logits.view(-1, logits.size(-1)), target.view(-1))
+            loss = criterion(logits.view(-1, logits.size(-1)), labels.view(-1))
+    
             epoch_loss += loss.item()
 
         total_loss = epoch_loss / len(valid_loader)
-    
+
     return total_loss
 
 def train(
@@ -57,9 +57,10 @@ def train(
 ):
     """ Train with next word prediction
     
-    train_loader => (x, emotion_1, emotion_2)
-    x: <s> <sp1> {sentence1} <sp2> {sentence2} </s>
-    emotion_1, emotion_2: emotion label
+    train_loader => (input_ids, attention_ids, emotion_1, emotion_2)
+    - input_ids: (batched) <s> <sp1> {sentence1} <sp2> {sentence2} </s>
+    - attention_ids: [1, 1, 1, 1, 1, ..., 0, 0]
+    - emotion_1, emotion_2: emotion labels
     
     In this train flow, we will only use x for simplicity. (This may be changed after)
     """ 
@@ -80,32 +81,32 @@ def train(
     
     model.to(device)
     for epoch in range(n_epochs):
+        model.train()
         epoch_loss = 0.0
-        for step, inputs in enumerate(train_loader):
-            model.train()
-            x, _, _ = inputs # x: (N, max_seq_len)
-            y = x[:, 1:].contiguous()
-            x, y = x.to(device), y.to(device)
-            # x: (batched) <s> <sp1> {sentence1} <sp2> {sentence2} </s>
-            # _: emotion labels
+        for step, (input_ids, attention_ids, *_) in enumerate(train_loader):
+            # input_ids: (batched) <s> <sp1> {sentence1} <sp2> {sentence2} </s>
+            # attention_ids: [1, 1, 1, 1, 1, ..., 0, 0]
+            # Other(*_): emotion labels
+            input_ids, attention_ids = input_ids.to(device), attention_ids.to(device) # (N, max_seq_len)
+            labels = input_ids[:, 1:].contiguous() # labels: (N, seq_len - 1)
 
             optimizer.zero_grad()
-            logits = model(x) # (N, seq_len, vocab_size)
+
+            logits = model(input_ids=input_ids, attention_ids=attention_ids) # (N, seq_len, vocab_size)
             logits = logits[:, :-1, :].contiguous() # (N, seq_len - 1, vocab_size)
-            target = x[:, 1:].contiguous() # (N, seq_len - 1)
-            
-            loss = criterion(logits.view(-1, logits.size(-1)), target.view(-1))
+
+            loss = criterion(logits.view(-1, logits.size(-1)), labels.view(-1))
             loss.backward()
+
             optimizer.step()
             
             epoch_loss += loss.item()
-            
             if (step + 1) % logging_step == 0:
                 print(f"[Epoch {epoch + 1}/{n_epochs}] Step {step  + 1}/{len(train_loader)} | loss: {epoch_loss/(step + 1): .3f}")
         
         train_loss.append(epoch_loss / len(train_loader))
         valid_loss = validate(model, valid_loader, device)
-        
+
         if valid_loss < best_loss:
             best_loss = valid_loss
             save_ckpt(
@@ -113,6 +114,7 @@ def train(
                 model=model, epoch=epoch + 1, 
                 train_loss=train_loss, best_loss=best_loss
             )
+            print(f"Success to save checkpoint. Best loss so far: {best_loss: .3f}")
 
         print(f"[Epoch {epoch + 1}/{n_epochs}] Test generation")
         print(f"Input: {gen_ex_input}")

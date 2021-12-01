@@ -87,7 +87,7 @@ class DialogueDataset(Dataset):
             'emotion_2': emotion_2_dict
         })
         
-        self.dialogues = []
+        self.input_ids = []
         self.emotion_1 = df.emotion_1.tolist()
         self.emotion_2 = df.emotion_2.tolist()
 
@@ -96,17 +96,17 @@ class DialogueDataset(Dataset):
         for q, a in zip(q_set, a_set):
             ids = [vocab.bos_token_id, vocab.sp1_token_id] + q \
                     + [vocab.sp2_token_id] + a + [vocab.eos_token_id]
-            self.dialogues.append(ids)
+            self.input_ids.append(ids)
 
     def __getitem__(self, idx):
         return (
-            torch.tensor(self.dialogues[idx]),
+            torch.tensor(self.input_ids[idx]),
             torch.tensor(self.emotion_1[idx]),
             torch.tensor(self.emotion_2[idx])
         )
         
     def __len__(self):
-        return len(self.dialogues)
+        return len(self.input_ids)
 
 
 def load_data_loader(ds, pad_token_id, batch_size, shuffle=False):
@@ -115,16 +115,17 @@ def load_data_loader(ds, pad_token_id, batch_size, shuffle=False):
             self.pad_token_id = pad_token_id
 
         def __call__(self, data):
-            dialogue, emotion_1, emotion_2 = zip(*data)
-            dialogue = pad_sequence(
-                dialogue,
+            input_ids, emotion_1, emotion_2 = zip(*data)
+            input_ids = pad_sequence(
+                input_ids,
                 batch_first=True,
                 padding_value=self.pad_token_id
             ).long()
+            attention_ids = (input_ids != pad_token_id).float()
             emotion_1 = torch.stack(emotion_1, dim=0)
             emotion_2 = torch.stack(emotion_2, dim=0)
 
-            return dialogue, emotion_1, emotion_2
+            return input_ids, attention_ids, emotion_1, emotion_2
 
     num_workers = get_num_workers()
     data_loader = DataLoader(
