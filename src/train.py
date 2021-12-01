@@ -58,12 +58,13 @@ def train(
 ):
     """ Train with next word prediction
     
-    train_loader => (x, y)
+    train_loader => (x, emotion_1, emotion_2)
     x: <s> <sp1> {sentence1} <sp2> {sentence2} </s>
-    y: emotion label
+    emotion_1, emotion_2: emotion label
     
     In this train flow, we will only use x for simplicity. (This may be changed after)
     """ 
+
     criterion = nn.CrossEntropyLoss()
     optimizer = None
     if opt == 'adamw':
