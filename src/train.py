@@ -65,6 +65,9 @@ def train(
     In this train flow, we will only use x for simplicity. (This may be changed after)
     """ 
 
+    # Make a directory to save the checkpoint weight(s)
+    os.makedirs(ckpt_path, exist_ok=True)
+        
     criterion = nn.CrossEntropyLoss()
     optimizer = None
     if opt == 'adamw':
