@@ -116,7 +116,7 @@ def train(
             )
 
         print(f"[Epoch {epoch + 1}/{n_epochs}] Test generation")
-        print(f"Input: {gen_example}")
+        print(f"Input: {gen_ex_input}")
         response_sentence = generate(
             user_input=gen_ex_input,
             max_seq_len=gen_max_seq_len,
