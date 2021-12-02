@@ -24,6 +24,8 @@ def get_arg_parser():
                         help='Tokenizer type, option: Ltokenizer, Mecab')
     parser.add_argument('--gen-policy', '-gp', type=str, default="greedy",
                         help='Teneration policy, option: greedy, beam, topk')
+    parser.add_argument('--gen-ex-input', '-gei', type=str, default="나 요즘 너무 우울해.",
+                        help='Sample input (ex. --gen-ex-input "나 요즘 너무 우울해.")')
     parser.add_argument('--logging-step', '-ls', type=int, default=150,
                         help='Logging step during train')
 

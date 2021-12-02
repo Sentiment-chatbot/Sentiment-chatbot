@@ -74,6 +74,7 @@ class Vocabulary(object):
 
 
 class DialogueDataset(Dataset):
+    """ Dialogue dataset for train/valid """
     def __init__(self, df, vocab, tokenizer):
         super().__init__()
         emotion_1_types = df.emotion_1.unique()
@@ -86,7 +87,7 @@ class DialogueDataset(Dataset):
             'emotion_1': emotion_1_dict,
             'emotion_2': emotion_2_dict
         })
-        
+
         self.input_ids = []
         self.emotion_1 = df.emotion_1.tolist()
         self.emotion_2 = df.emotion_2.tolist()
@@ -98,8 +99,11 @@ class DialogueDataset(Dataset):
                     + [vocab.sp2_token_id] + a + [vocab.eos_token_id]
             self.input_ids.append(ids)
 
+        self.q_ids = q_set
+
     def __getitem__(self, idx):
         return (
+            torch.tensor(self.q_ids[idx]),
             torch.tensor(self.input_ids[idx]),
             torch.tensor(self.emotion_1[idx]),
             torch.tensor(self.emotion_2[idx])
@@ -109,13 +113,46 @@ class DialogueDataset(Dataset):
         return len(self.input_ids)
 
 
+class DialogueTestDataset(Dataset):
+    """ Dialogue dataset for test """
+    def __init__(self, df, vocab, tokenizer):
+        super().__init__()
+
+        self.input_ids = []
+        self.input_raws = df.q.tolist()
+        self.label_ids = []
+        self.label_raws = df.a.tolist()
+        # self.emotion_1 = df.emotion_1.tolist()
+        # self.emotion_2 = df.emotion_2.tolist()
+
+        q_set = tokenizer.encode(self.input_raws)
+        a_set = tokenizer.encode(self.label_raws)
+        for q, a in zip(q_set, a_set):
+            input_id = [vocab.bos_token_id, vocab.sp1_token_id] + q + [vocab.sp2_token_id]
+            self.input_ids.append(input_id)
+            self.label_ids.append(a + [vocab.eos_token_id])
+
+    def __getitem__(self, idx):
+        return (
+            torch.tensor(self.input_ids[idx]),
+            self.input_raws[idx],
+            torch.tensor(self.label_ids[idx]),
+            self.label_raws[idx]
+        )
+
+    def __len__(self):
+        return len(self.input_ids)
+
+
 def load_data_loader(ds, pad_token_id, batch_size, shuffle=False):
+    """ Data loader for train/validation """
+
     class Collate(object):
         def __init__(self, pad_token_id):
             self.pad_token_id = pad_token_id
 
         def __call__(self, data):
-            input_ids, emotion_1, emotion_2 = zip(*data)
+            q_ids, input_ids, emotion_1, emotion_2 = zip(*data)
             input_ids = pad_sequence(
                 input_ids,
                 batch_first=True,
@@ -125,7 +162,7 @@ def load_data_loader(ds, pad_token_id, batch_size, shuffle=False):
             emotion_1 = torch.stack(emotion_1, dim=0)
             emotion_2 = torch.stack(emotion_2, dim=0)
 
-            return input_ids, attention_ids, emotion_1, emotion_2
+            return q_ids, input_ids, attention_ids, emotion_1, emotion_2
 
     num_workers = get_num_workers()
     data_loader = DataLoader(
@@ -137,3 +174,16 @@ def load_data_loader(ds, pad_token_id, batch_size, shuffle=False):
     )
 
     return data_loader
+
+def load_test_loader(test_ds):
+    """ Data loader for test (without batching) """
+
+    num_workers = get_num_workers()
+    test_data_loader = DataLoader(
+        test_ds,
+        batch_size=1,
+        shuffle=False,
+        num_workers=num_workers
+    )
+
+    return test_data_loader

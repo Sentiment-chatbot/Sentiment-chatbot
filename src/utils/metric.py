@@ -1,45 +1,41 @@
-from KoBERTScore import BERTScore
+import numpy as np
+
+# from KoBERTScore import BERTScore
 from soynlp.tokenizer import LTokenizer
 import nltk.translate.bleu_score as bleu
 
+# Perplexity score
+def perplexity_score(cross_entropy_val):
+    """ 
+    Args: 
+        cross_entropy_val: float (not a torch.tensor)
+    """
+    return np.exp(cross_entropy_val)
 
-def koBERTscore(ref, gen):
-    model_name = "beomi/kcbert-base"
-    bertscore = BERTScore(model_name, best_layer=4)
-    bertscore(ref, gen, batch_size=128)
-    # [0.5643115, 0.4720116, 0.2556618, 0.2268927]
+# BERT score
+# def koBERTscore(ref, gen):
+#     model_name = "beomi/kcbert-base"
+#     bertscore = BERTScore(model_name, best_layer=4)
+#     bertscore(ref, gen, batch_size=128)
+#     # [0.5643115, 0.4720116, 0.2556618, 0.2268927]
 
-def ROUGE_n(ref, gen, n):
+# ROUGE-N
+def rouge_n_score(ref, gen, n):
     recall = 0                  
     
     for r, g in zip(ref, gen):
         r = get_ngram(r, n)
         g = get_ngram(g, n)
-        Set_r = set(r)
-        Set_g = set(g)
-        recall += 1 - (len(Set_r - Set_g) / len(r))
-        # print("recall : {}".format(precision, recall))
-    recall = recall/len(ref)
+        set_r = set(r)
+        set_g = set(g)
+        recall += (1 - (len(set_r - set_g) / len(r)))
+    recall = recall / len(ref)
 
     return recall
 
-def BLEU(ref, gen, n):
-    precision = 0               # BLEU
-    
-    for r, g in zip(ref, gen):
-        r = get_ngram(r, n)
-        g = get_ngram(g, n)
-        Set_r = set(r)
-        Set_g = set(g)
-        precision += 1 - (len(Set_g - Set_r) / len(g))
-        # print("precision : {}\nrecall : {}".format(precision, recall))
-    precision = precision/len(ref)
-
-    return precision
-
-def nltk_BLEU(refs, gen):
+# BLEU
+def bleu_score(refs, gen):
     return bleu.sentence_bleu(list(map(lambda ref: ref.split(), refs)),gen.split())
-
 
 def get_ngram(sentence, n):
     tokenizer = LTokenizer()

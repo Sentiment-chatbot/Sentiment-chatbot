@@ -7,7 +7,7 @@ import wandb
 
 from .model import GPT2Model
 from .option import GPT2DefaultConfig, get_arg_parser
-from .train import train
+from .train import train, test
 from .utils import set_seed
 from .utils.tokenizer import Tokenizer
 from .utils.preprocessing import (
@@ -16,8 +16,10 @@ from .utils.preprocessing import (
     make_vocab,
     get_vocab
 )
-from .utils.dataset import DialogueDataset, load_data_loader
-from .utils.generate import generate
+from .utils.dataset import (
+    DialogueDataset, load_data_loader,
+    DialogueTestDataset, load_test_loader
+)
 
 
 def main():
@@ -68,14 +70,14 @@ def main():
     print("Load datasets...")
     train_ds = DialogueDataset(train_df, vocab, tokenizer)
     valid_ds = DialogueDataset(valid_df, vocab, tokenizer)
-    test_ds = DialogueDataset(test_df, vocab, tokenizer)
+    test_ds = DialogueTestDataset(test_df, vocab, tokenizer)
     print("Finish. \n")
     
     # Loading dataloader
     print("Load dataloaders...")
     train_loader = load_data_loader(train_ds, vocab.pad_token_id, args.batch_size, shuffle=True)
-    valid_loader = load_data_loader(valid_ds, vocab.pad_token_id, args.batch_size)
-    test_loader = load_data_loader(test_ds, vocab.pad_token_id, args.batch_size)
+    valid_loader = load_data_loader(valid_ds, vocab.pad_token_id, args.batch_size, shuffle=False)
+    test_loader = load_test_loader(test_ds)
     print("Finish. \n")
 
     # Loading model
@@ -83,7 +85,7 @@ def main():
     model = GPT2Model(**GPT2DefaultConfig, vocab_size=len(vocab), device=device)
 
     # Wandb link
-    print("\nWandb initialization")
+    print("\n--Wandb initialization--")
     wandb.init(
         project="Final project",
         entity="skku-2021-2-ap-team15",
@@ -101,11 +103,23 @@ def main():
         n_epochs=args.n_epochs,
         gen_max_seq_len=20,
         gen_policy=args.gen_policy,
-        gen_ex_input="나 요즘 너무 우울해.",
+        gen_ex_input=args.gen_ex_input,
         device=device,
         logging_step=args.logging_step,
     )
-    print("Finish. \n")
+    print("Finish.\n")
+
+    # Start testing
+    print("Start test.")
+    rouge, perplexity = test(
+        model=model,
+        test_loader=test_loader,
+        tokenizer=tokenizer,
+        gen_policy=args.gen_policy,
+        device=device
+    )
+    print(f"ROUGE-3: {rouge} Perplexity: {perplexity}")
+    print("Finish.\n")
 
     print("All finished.")
 

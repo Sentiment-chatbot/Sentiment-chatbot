@@ -6,7 +6,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from .utils.generate import generate
+from .utils.metric import perplexity_score
+from .utils.generate import generate_with_user_input, generate_with_data_loader
 
 
 def save_ckpt(ckpt_path, model, epoch, train_loss, best_loss):
@@ -18,12 +19,14 @@ def save_ckpt(ckpt_path, model, epoch, train_loss, best_loss):
     }, ckpt_path)
     
 def validate(model, valid_loader, device):
+    """ Validate with teacher forcing """
+
     criterion = nn.CrossEntropyLoss()
     model.eval()
 
     with torch.no_grad():
         epoch_loss = 0.0
-        for step, (input_ids, attention_ids, *_) in enumerate(valid_loader):
+        for step, (_, input_ids, attention_ids, *_) in enumerate(valid_loader):
             # input_ids: (batched) <s> <sp1> {sentence1} <sp2> {sentence2} </s>
             # attention_ids: [1, 1, 1, 1, 1, ..., 0, 0]
             # Other(*_): emotion labels
@@ -37,9 +40,9 @@ def validate(model, valid_loader, device):
     
             epoch_loss += loss.item()
 
-        total_loss = epoch_loss / len(valid_loader)
+        valid_loss = epoch_loss / len(valid_loader)
 
-    return total_loss
+    return valid_loss, perplexity_score(valid_loss)
 
 def train(
     model,
@@ -57,9 +60,10 @@ def train(
     ckpt_path='./ckpt',
     logging_step=300 
 ):
-    """ Train with next word prediction
+    """ Train with next word prediction (Teacher forcing)
     
     train_loader => (input_ids, attention_ids, emotion_1, emotion_2)
+    - q_ids: input ids of only sp1, used for LSTM classifier (not batched)
     - input_ids: (batched) <s> <sp1> {sentence1} <sp2> {sentence2} </s>
     - attention_ids: [1, 1, 1, 1, 1, ..., 0, 0]
     - emotion_1, emotion_2: emotion labels
@@ -87,13 +91,13 @@ def train(
 
     losses = []
     train_loss = []
-    best_loss = float('inf')
+    best_pp = float('inf')
     
     model.to(device)
     for epoch in range(n_epochs):
         model.train()
         epoch_loss = 0.0
-        for step, (input_ids, attention_ids, *_) in enumerate(train_loader):
+        for step, (_, input_ids, attention_ids, *_) in enumerate(train_loader):
             # input_ids: (batched) <s> <sp1> {sentence1} <sp2> {sentence2} </s>
             # attention_ids: [1, 1, 1, 1, 1, ..., 0, 0]
             # Other(*_): emotion labels
@@ -114,27 +118,30 @@ def train(
 
             # Wandb logging
             wandb.log({
-                "train_loss": epoch_loss / (step + 1)
+                "train_loss": epoch_loss / (step + 1),
+                "train_pp": perplexity_score(epoch_loss / (step + 1))
             })
 
             if (step + 1) % logging_step == 0:
                 print(f"[Epoch {epoch + 1}/{n_epochs}] Step {step  + 1}/{len(train_loader)} | loss: {epoch_loss/(step + 1): .3f}")
-        
-        train_loss.append(epoch_loss / len(train_loader))
-        valid_loss = validate(model, valid_loader, device)
 
-        if valid_loss < best_loss:
-            best_loss = valid_loss
+        train_loss.append(epoch_loss / len(train_loader))
+        valid_loss, valid_pp = validate(model, valid_loader, device)
+    
+        if valid_pp < best_pp:
+            best_pp = valid_pp
             save_ckpt(
                 ckpt_path=p.join(ckpt_path, f"checkpoint_epoch_{epoch + 1}.pt"), 
                 model=model, epoch=epoch + 1, 
-                train_loss=train_loss, best_loss=best_loss
+                train_loss=train_loss, best_loss=valid_loss
             )
-            print(f"Success to save checkpoint. Best loss so far: {best_loss: .3f}")
+            print(f"Success to save checkpoint. Best perplexity so far: {best_pp: .3f}")
+        else:
+            print("No improvement detected. Skipping save")
 
         print(f"[Epoch {epoch + 1}/{n_epochs}] Test generation")
         print(f"Input: {gen_ex_input}")
-        response_sentence = generate(
+        response_sentence = generate_with_user_input(
             user_input=gen_ex_input,
             max_seq_len=gen_max_seq_len,
             model=model,
@@ -143,3 +150,25 @@ def train(
             device=device
         )
         print(f"Output: {response_sentence}")
+
+        # Wandb logging
+        wandb.log({
+            "valid_loss": valid_loss,
+            "valid_pp": valid_pp,
+            "generated": f"Input: {gen_ex_input} / Output: {response_sentence}"
+        })
+
+def test(
+    model,
+    test_loader,
+    tokenizer,
+    gen_policy,
+    device
+):
+    return generate_with_data_loader(
+        model,
+        test_loader,
+        tokenizer,
+        gen_policy,
+        device
+    )
