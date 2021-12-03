@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from .utils.lr_scheduler import ModifiedCosineAnnealingWarmRestarts
 from .utils.metric import perplexity_score
 from .utils.generate import generate_with_user_input, generate_with_data_loader
 
@@ -84,10 +85,12 @@ def train(
     else:
         raise NotImplementedError
 
-    # TODO: Learning scheduler
-    # scheduler = None
-    # if scheduler == 'SGDR':
-    #     scheduler = CustomCosineAnnealingWarmRestart(optimizer)
+    # Learning scheduler
+    scheduler = None
+    if lr_scheduler == 'SGDR':
+        scheduler = ModifiedCosineAnnealingWarmRestarts(
+            optimizer, T_0=n_epochs // 10, T_up=n_epochs // 20, T_mult=1, eta_max=0.1, gamma=0.5
+        )
 
     losses = []
     train_loss = []
@@ -125,6 +128,7 @@ def train(
             if (step + 1) % logging_step == 0:
                 print(f"[Epoch {epoch + 1}/{n_epochs}] Step {step  + 1}/{len(train_loader)} | loss: {epoch_loss/(step + 1): .3f}")
 
+        scheduler.step()
         train_loss.append(epoch_loss / len(train_loader))
         valid_loss, valid_ppl = validate(model, valid_loader, device)
     
@@ -153,6 +157,7 @@ def train(
 
         # Wandb logging
         wandb.log({
+            "learning_rate": scheduler.get_last_lr()[0],
             "valid_loss": valid_loss,
             "valid_ppl": valid_ppl,
             "generated": f"Input: {gen_ex_input} / Output: {response_sentence}"

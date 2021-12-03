@@ -31,7 +31,7 @@ def get_arg_parser():
     parser.add_argument('--DEBUG', dest='debug', action='store_true',
                         help="Disable the wandb to log if debug option is true")
     parser.add_argument('--NO-DEBUG', dest='debug', action='store_false')
-    parser.set_defaults(debug=True)
+    parser.set_defaults(debug=False)
 
 
     return parser
