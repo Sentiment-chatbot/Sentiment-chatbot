@@ -183,7 +183,6 @@ def generate_with_data_loader(
         while len(pred_ids) != label_ids.size(-1):
             pred, logits = generate_fn(model, input_ids) # single index
             pred_logits.append(logits)
-            print(pred, logits)
             pred_ids.append(pred.item())
             input_ids = torch.cat((input_ids, pred.view(1, 1)), dim=-1)
 
