@@ -91,7 +91,7 @@ def train(
 
     losses = []
     train_loss = []
-    best_pp = float('inf')
+    best_ppl = float('inf')
     
     model.to(device)
     for epoch in range(n_epochs):
@@ -119,23 +119,23 @@ def train(
             # Wandb logging
             wandb.log({
                 "train_loss": epoch_loss / (step + 1),
-                "train_pp": perplexity_score(epoch_loss / (step + 1))
+                "train_ppl": perplexity_score(epoch_loss / (step + 1))
             })
 
             if (step + 1) % logging_step == 0:
                 print(f"[Epoch {epoch + 1}/{n_epochs}] Step {step  + 1}/{len(train_loader)} | loss: {epoch_loss/(step + 1): .3f}")
 
         train_loss.append(epoch_loss / len(train_loader))
-        valid_loss, valid_pp = validate(model, valid_loader, device)
+        valid_loss, valid_ppl = validate(model, valid_loader, device)
     
-        if valid_pp < best_pp:
-            best_pp = valid_pp
+        if valid_ppl < best_ppl:
+            best_ppl = valid_ppl
             save_ckpt(
                 ckpt_path=p.join(ckpt_path, f"checkpoint_epoch_{epoch + 1}.pt"), 
                 model=model, epoch=epoch + 1, 
                 train_loss=train_loss, best_loss=valid_loss
             )
-            print(f"Success to save checkpoint. Best perplexity so far: {best_pp: .3f}")
+            print(f"Success to save checkpoint. Best perplexity so far: {best_ppl: .3f}")
         else:
             print("No improvement detected. Skipping save")
 
@@ -154,7 +154,7 @@ def train(
         # Wandb logging
         wandb.log({
             "valid_loss": valid_loss,
-            "valid_pp": valid_pp,
+            "valid_ppl": valid_ppl,
             "generated": f"Input: {gen_ex_input} / Output: {response_sentence}"
         })
 

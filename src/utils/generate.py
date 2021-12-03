@@ -7,37 +7,80 @@ import torch.nn.functional as F
 from .metric import perplexity_score, rouge_n_score, bleu_score
 
 
-def log(number):
-    # log에 0이 들어가는 것을 막기 위해 아주 작은 수를 더해줌.
-    return np.log(number + 1e-10)
+def greedy_search(model, input_ids):
+    """ Greedy search strategy for text generation
+    Args:
+        model: model
+        input_ids: size(1, seq_len)
+        predictions(torch.tensor): size(L, seq_len, vocab_size)
+    Return:
+        pred(torch.tensor, size(1)): Predicted word vocab index
+        logits: logits
+    """
 
-def greedy_search(prediction):
-    # prediction(torch.tensor): seq_len, vocab_size
-    return torch.argmax(prediction[-1, :])
+    with torch.no_grad():
+        out = model(input_ids).squeeze(0) # (seq_len, vocab_size)
+        logits = out[-1, :] # (vocab_size)
+        pred = torch.argmax(logits) # (1)
 
-def beam_search(predictions, k=None):
-    # prediction: (seq_len, vocab_size)
-    sequences = [[list(), 1.0]]
+    return pred, logits
 
-    for row in predictions:
-        all_candidates = list()
+def top_p_sampling(model, input_ids, p=0.9):
+    """ Top-p (Nucleus) sampling strategy for text generation
+    Args:
+        model: model
+        input_ids: size(1, seq_len)
+        predictions(torch.tensor): size(L, seq_len, vocab_size)
+    Return:
+        pred(torch.tensor, size(1)): Predicted word vocab index
+        logits: logits
+    """
 
-        # 1. 각각의 timestep에서 가능한 후보군으로 확장
-        for i in range(len(sequences)):
-            seq, score = sequences[i]
+    _, logits = greedy_search(model, input_ids)
+    sorted_logits, idxs = torch.sort(logits, descending=True)
+    probs = F.softmax(sorted_logits, dim=-1) # (vocab_size)
 
-            # 2. 확장된 후보 스텝에 대해 점수 계산
-            for j in range(len(row)):
-                new_seq = seq + [j]
-                new_score = score * -log(row[j])
-                candidate = [new_seq, new_score]
-                all_candidates.append(candidate)
+    cut_idx = -1
+    cumsum = 0.0
+    for i, prob in enumerate(probs):
+        cumsum += prob.cpu().item()
+        if cumsum >= p:
+            cut_idx = i
+            break
 
-        # 3. 가능도가 높은 k개의 시퀀스만 남김
-        ordered = sorted(all_candidates, key=lambda tup: tup[1])  # 점수 기준 정렬
-        sequences = ordered[:k]
+    logits[idxs[cut_idx + 1:]] = float('-inf')
+    pred = torch.multinomial(F.softmax(logits, dim=-1), 1)
 
-    return sequences
+    return pred, logits
+
+# def beam_search(predictions, k=5):
+#     """ Beam search strategy for text generation
+
+#     Args:
+#         predictions(torch.tensor): seq_len, vocab_size
+#     """
+#     if k != 5:
+#         raise NotImplementedError
+
+#     epsilon = 1e-10
+#     sequences = [[list(), 1.0]]
+
+#     for row in predictions:
+#         all_candidates = list()
+
+#         for i in range(len(sequences)):
+#             seq, score = sequences[i]
+
+#             for j in range(len(row)):
+#                 new_seq = seq + [j]
+#                 new_score = score * -np.log(row[j] + epsilon)
+#                 candidate = [new_seq, new_score]
+#                 all_candidates.append(candidate)
+
+#         ordered = sorted(all_candidates, key=lambda tup: tup[1])
+#         sequences = ordered[:k]
+
+#     return sequences
 
 def generate_with_user_input(
     user_input,
@@ -59,10 +102,13 @@ def generate_with_user_input(
     Return:
         pred_sentence(str): Generated output
                 ex) "힘드시겠어요. 힘내세요." (expected)
-    """ 
+    """
+
     generate_fn = None
     if gen_policy == "greedy":
         generate_fn = greedy_search
+    elif gen_policy == "top-p":
+        generate_fn = top_p_sampling
     else:
         raise NotImplementedError
     
@@ -80,9 +126,7 @@ def generate_with_user_input(
     pred_ids = []
     with torch.no_grad():
         for _ in range(max_seq_len):
-            logits = model(input_ids).squeeze(0) # (seq_len, vocab_size)
-            pred = generate_fn(logits) # single index
-            
+            pred, logits = generate_fn(model, input_ids)
             if(pred.item() == tokenizer.vocab.eos_token_id):
                 break
             pred_ids.append(pred.item())
@@ -113,6 +157,8 @@ def generate_with_data_loader(
     generate_fn = None
     if gen_policy == "greedy":
         generate_fn = greedy_search
+    elif gen_policy == "top-p":
+        generate_fn = top_p_sampling
     else:
         raise NotImplementedError
     
@@ -125,38 +171,34 @@ def generate_with_data_loader(
     input_sentences = []
     label_sentences = []
     perplexities = []
-    with torch.no_grad():
-        epoch_loss = 0.0
-        for step, (input_ids, input_raws, label_ids, label_raws) in enumerate(test_loader):
-            input_ids, label_ids = input_ids.to(device), label_ids.to(device) # (1, q_len), (1, a_len)
+    epoch_loss = 0.0
+    for step, (input_ids, input_raws, label_ids, label_raws) in enumerate(test_loader):
+        input_ids, label_ids = input_ids.to(device), label_ids.to(device) # (1, q_len), (1, a_len)
 
-            if label_ids.size(-1) < 3: # For calculate score more valid sentence
-                continue
+        if label_ids.size(-1) < 3: # For calculate score more valid sentence
+            continue
 
-            pred_ids = []
-            pred_logits = []
-            while True:
-                logits = model(input_ids).squeeze(0) # (seq_len, vocab_size)
-                pred_logits.append(logits[-1, :]) # (vocab_size)
-                pred = generate_fn(logits) # single index
-                pred_ids.append(pred.item())
+        pred_ids = []
+        pred_logits = []
+        while len(pred_ids) != label_ids.size(-1):
+            pred, logits = generate_fn(model, input_ids) # single index
+            pred_logits.append(logits)
+            print(pred, logits)
+            pred_ids.append(pred.item())
+            input_ids = torch.cat((input_ids, pred.view(1, 1)), dim=-1)
 
-                if len(pred_ids) == label_ids.size(-1):
-                    break
-                input_ids = torch.cat((input_ids, pred.view(1, 1)), dim=-1)
+        pred_sentences.append(tokenizer.decode(pred_ids))
+        input_sentences.append(input_raws[0])
+        label_sentences.append(label_raws[0])
 
-            pred_sentences.append(tokenizer.decode(pred_ids))
-            input_sentences.append(input_raws[0])
-            label_sentences.append(label_raws[0])
+        cross_entropy = F.cross_entropy(
+            input=torch.stack(pred_logits, dim=0), # (a_len, vocab_size)
+            target=label_ids.squeeze(0) # (a_len)
+        ).cpu().numpy()
+        perplexities.append(perplexity_score(cross_entropy))
 
-            cross_entropy = F.cross_entropy(
-                input=torch.stack(pred_logits, dim=0), # (a_len, vocab_size)
-                target=label_ids.squeeze(0) # (a_len)
-            ).cpu().numpy()
-            perplexities.append(perplexity_score(cross_entropy))
-
-            if (step + 1) % 1000 == 0:
-                print(f"[Step {step + 1}/{len(test_loader)}] Ongoing...")
+        if (step + 1) % 1000 == 0:
+            print(f"[Step {step + 1}/{len(test_loader)}] Ongoing...")
 
     rouges = [rouge_n_score(
         refs=label_sentences,

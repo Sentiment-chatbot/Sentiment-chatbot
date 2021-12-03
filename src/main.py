@@ -25,6 +25,7 @@ from .utils.dataset import (
 def main():
     parser = get_arg_parser()
     args = parser.parse_args()
+    print(args)
 
     # Set device
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -110,6 +111,7 @@ def main():
         gen_policy=args.gen_policy,
         gen_ex_input=args.gen_ex_input,
         device=device,
+        learning_rate=args.learning_rate,
         logging_step=args.logging_step,
     )
     print("Finish.\n")
@@ -136,4 +138,5 @@ def main():
 if __name__ == '__main__':
     main()
 
-#### python -m src.main --seed 42 --batch_size 64 --epoch 1 --learning-rate 1e-4
+# python -m src.main --DEBUG --logging-step 5 --batch-size 2 --gen-policy top-p
+# python -m src.main --seed 42 --batch_size 64 --epoch 1 --learning-rate 1e-4
