@@ -3,6 +3,7 @@ import numpy as np
 # from KoBERTScore import BERTScore
 from soynlp.tokenizer import LTokenizer
 import nltk.translate.bleu_score as bleu
+from rouge import Rouge
 
 # Perplexity score
 def perplexity_score(cross_entropy_val):
@@ -33,6 +34,19 @@ def rouge_n_score(ref, gen, n):
 
     return recall
 
+def rouge_lib(ref, gen): # Using ROUGE score library
+    rouge = Rouge()
+    score = rouge.get_scores(gen, ref, avg=True)
+    """
+    score: 
+    {
+        'rouge-1': {'r': 0.35, 'p': 0.3181818181818182, 'f': 0.3333333308390023},
+        'rouge-2': {'r': 0.2777777777777778, 'p': 0.25, 'f': 0.26315789224376734},
+        'rouge-l': {'r': 0.35, 'p': 0.3181818181818182, 'f': 0.3333333308390023}
+    }
+    """
+    return score
+
 # BLEU
 def bleu_score(refs, gen):
     return bleu.sentence_bleu(list(map(lambda ref: ref.split(), refs)),gen.split())
@@ -52,19 +66,22 @@ def convert_ngram_tokens(tokens, n):
     return n_gram_tokens
 
 
+
+
 # references = [
 #     '날씨는 좋고 하지만 할일은 많고 끝났다 어우'#,
-#     # '이 영화 정말 재밌었어요',
-#     # '점수가 낮은 문장',
+#     '이 영화 정말 재밌었어요',
+#     '점수가 낮은 문장',
 #     ]
 # candidates = [
 #     '날씨는 좋고 하지만 할일은 많고 어우'#,
-#     # '영화 정말 재밌었어요 잘 고른거 같아',
-#     # '브라질 열대우림이 장기간 화재로 면적이 줄어들고 있습니다',
+#     '영화 정말 재밌었어요 잘 고른거 같아',
+#     '브라질 열대우림이 장기간 화재로 면적이 줄어들고 있습니다',
 # ]
 
 # candidate = '날씨는 좋고 하지만 할일은 많고 어우'
-
-
+# rouge = Rouge()
+# print(rouge.get_scores(candidates, references, avg=True))
+# print(rouge_lib(references, candidates))
 # print("handmade BLEU : {}".format(BLEU(references, candidates, 4)))
 # print("nltk BLEU : {}".format(bleu.sentence_bleu(list(map(lambda ref: ref.split(), references)),candidate.split())))
