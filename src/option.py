@@ -28,6 +28,11 @@ def get_arg_parser():
                         help='Sample input (ex. --gen-ex-input "나 요즘 너무 우울해.")')
     parser.add_argument('--logging-step', '-ls', type=int, default=150,
                         help='Logging step during train')
+    parser.add_argument('--DEBUG', dest='debug', action='store_true',
+                        help="Disable the wandb to log if debug option is true")
+    parser.add_argument('--NO-DEBUG', dest='debug', action='store_false')
+    parser.set_defaults(debug=True)
+
 
     return parser
 

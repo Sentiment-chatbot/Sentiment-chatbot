@@ -86,12 +86,17 @@ def main():
 
     # Wandb link
     print("\n--Wandb initialization--")
-    wandb.init(
-        project="Final project",
-        entity="skku-2021-2-ap-team15",
-    )
-    wandb.config.update(args)
-    wandb.run.name = datetime.now().strftime('%Y-%m-%d %H:%M')
+    if args.debug:
+        print("DEBUGGING MODE - Start without wandb")
+        wandb.init(mode="disabled")
+    else:
+        print("Start train & test with wandb")
+        wandb.init(
+            project="Final project",
+            entity="skku-2021-2-ap-team15",
+        )
+        wandb.config.update(args)
+        wandb.run.name = datetime.now().strftime('%Y-%m-%d %H:%M')
 
     # Start training
     print("Start train.")
@@ -111,16 +116,21 @@ def main():
 
     # Start testing
     print("Start test.")
-    rouge, perplexity = test(
+    rouges, bleus, perplexity = test(
         model=model,
         test_loader=test_loader,
         tokenizer=tokenizer,
         gen_policy=args.gen_policy,
         device=device
     )
-    print(f"ROUGE-3: {rouge} Perplexity: {perplexity}")
+
+    # Print metric scores
+    for i, (rouge, bleu) in enumerate(zip(rouges, bleus)):
+        print(f"BLEU-{i + 1}: {bleu: .4f} | ROUGE-{i + 1}: {rouge: .4f}")
+    print(f"Perplexity: {perplexity: .4f}")
     print("Finish.\n")
 
+    # Success
     print("All finished.")
 
 if __name__ == '__main__':

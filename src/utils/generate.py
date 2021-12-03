@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from .metric import perplexity_score, rouge_n_score
+from .metric import perplexity_score, rouge_n_score, bleu_score
 
 
 def log(number):
@@ -130,6 +130,9 @@ def generate_with_data_loader(
         for step, (input_ids, input_raws, label_ids, label_raws) in enumerate(test_loader):
             input_ids, label_ids = input_ids.to(device), label_ids.to(device) # (1, q_len), (1, a_len)
 
+            if label_ids.size(-1) < 3: # For calculate score more valid sentence
+                continue
+
             pred_ids = []
             pred_logits = []
             while True:
@@ -155,7 +158,16 @@ def generate_with_data_loader(
             if (step + 1) % 1000 == 0:
                 print(f"[Step {step + 1}/{len(test_loader)}] Ongoing...")
 
-    rouge = rouge_n_score(ref=label_sentences, gen=pred_sentences, n=3)
+    rouges = [rouge_n_score(
+        refs=label_sentences,
+        gens=pred_sentences, n=n
+    ) for n in range(1, 4)]
+
+    bleus = [bleu_score(
+        refs=label_sentences,
+        gens=pred_sentences, n=n
+    ) for n in range(1, 4)]
+
     perplexity = np.average(perplexities)
 
     print("--Example--")
@@ -167,4 +179,4 @@ def generate_with_data_loader(
         print(f"Label: {label_sentences[idx]}")    
         print("-------")
 
-    return rouge, perplexity
+    return rouges, bleus, perplexity
