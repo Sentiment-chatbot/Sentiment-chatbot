@@ -42,9 +42,17 @@ def get_ngram(sentence, n):
     
 def convert_ngram_tokens(tokens, n):
     n_gram_tokens = []
-    for i in range(len(tokens) - (n - 1)):
-        n_token = ""
-        for j in range(n):
-            n_token += tokens[i + j]
+    if len(tokens) < n:
+        n_token =""
+        for i in range(len(tokens)):
+            n_token += tokens[i]
         n_gram_tokens.append(n_token)
+    
+    else:
+        for i in range(len(tokens) - (n - 1)):
+            n_token = ""
+            for j in range(n):
+                n_token += tokens[i + j]
+                n_gram_tokens.append(n_token)
+                
     return n_gram_tokens
