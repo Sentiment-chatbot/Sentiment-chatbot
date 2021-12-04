@@ -5,8 +5,8 @@ from datetime import datetime
 import torch
 import wandb
 
-from .model import GPT2Model
-from .option import GPT2DefaultConfig, get_arg_parser
+from .model import GPT2Model, emoClassifier
+from .option import emoClassifierDefaultConfig, GPT2DefaultConfig, get_arg_parser
 from .train import train, test
 from .utils import set_seed
 from .utils.tokenizer import Tokenizer
@@ -82,6 +82,10 @@ def main():
     print("Finish. \n")
 
     # Loading model
+    print("Get classifier...")
+    model = emoClassifier(**emoClassifierDefaultConfig, device=device)
+
+    # Loading model
     print("Get model...")
     model = GPT2Model(**GPT2DefaultConfig, vocab_size=len(vocab), device=device)
 
@@ -139,4 +143,4 @@ if __name__ == '__main__':
     main()
 
 # python -m src.main --DEBUG --logging-step 5 --batch-size 2 --gen-policy top-p
-# python -m src.main --seed 42 --batch_size 64 --epoch 1 --learning-rate 1e-4
+# python -m src.main --seed 42 --batch_size 64 --n-epochs 1 --learning-rate 1e-4

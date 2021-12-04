@@ -1,5 +1,13 @@
 import argparse
 
+emoClassifierDefaultConfig = {
+    'emb_dim': 768,
+    'hidden_dim' : 1024,
+    'num_layers': 4,
+    'num_classes' : 8,
+    'dropout': 0.1
+}
+
 GPT2DefaultConfig = {
     'emb_dim': 768,
     'max_seq_len': 256,

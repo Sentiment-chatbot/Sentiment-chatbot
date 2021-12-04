@@ -252,3 +252,22 @@ class GPT2Model(nn.Module):
         logits = self.fc(self.layer_norm(logits)) # (N, seq_len, vocab_size)
 
         return logits
+
+class emoClassifier(nn.Module):
+    def __init__(self, num_layers, hidden_dim, emb_dim, num_classes, batch_size, dropout):
+        super(emoClassifier, self).__init__()
+        self.num_layers = num_layers
+        self.hidden_dim = hidden_dim
+        self.batch_size = batch_size
+        self.lstm = nn.LSTM(emb_dim, self.hidden_dim,
+                          num_layers=self.num_layers,
+                          batch_first=True)
+        self.out = nn.Linear(self.hidden_dim, num_classes)
+        self.dropout = nn.Dropout(p=dropout)
+
+    def forward(self, x):
+        x, _ = self.lstm(x)  # (N, seq_len, hidden_dim)
+        out = x[:,-1,:]  # (N, hidden_dim)
+        self.dropout(out)
+        logit = self.out(out)  # (N, hidden_dim) -> (N, num_classes)
+        return logit
