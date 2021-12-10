@@ -4,7 +4,7 @@ emoClassifierDefaultConfig = {
     'emb_dim': 768,
     'hidden_dim' : 1024,
     'num_layers': 4,
-    'num_classes' : 8,
+    'num_classes' : 2,
     'dropout': 0.1
 }
 

@@ -7,7 +7,7 @@ import wandb
 
 from .model import GPT2Model, emoClassifier
 from .option import emoClassifierDefaultConfig, GPT2DefaultConfig, get_arg_parser
-from .train import train, test, train_classifier
+from .train import train, test, train_classifier, test_classifier
 from .utils import set_seed
 from .utils.tokenizer import Tokenizer
 from .utils.preprocessing import (
@@ -72,6 +72,7 @@ def main():
     train_ds = DialogueDataset(train_df, vocab, tokenizer)
     valid_ds = DialogueDataset(valid_df, vocab, tokenizer)
     test_ds = DialogueTestDataset(test_df, vocab, tokenizer)
+    cls_test_ds = DialogueDataset(test_df, vocab, tokenizer)
     print("Finish. \n")
     
     # Loading dataloader
@@ -79,6 +80,7 @@ def main():
     train_loader = load_data_loader(train_ds, vocab.pad_token_id, args.batch_size, shuffle=True)
     valid_loader = load_data_loader(valid_ds, vocab.pad_token_id, args.batch_size, shuffle=False)
     test_loader = load_test_loader(test_ds)
+    cls_test_loader = load_data_loader(cls_test_ds, vocab.pad_token_id, args.batch_size, shuffle=False)
     print("Finish. \n")
 
     # Loading model
@@ -95,10 +97,17 @@ def main():
     # Train classifier
     print("Train classifier...")
     train_classifier(
-        model=model,
         classifier=classifier,
         train_loader=train_loader,
         n_epochs=args.n_epochs,
+        device=device
+    )
+
+    # Test classifier
+    print("Test classifier...")
+    test_classifier(
+        classifier=classifier,
+        test_loader=cls_test_loader,
         device=device
     )
 

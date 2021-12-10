@@ -277,5 +277,4 @@ class emoClassifier(nn.Module):
         out = out[:,-1,:]  # (N, hidden_dim)
         out = self.dropout(out)
         logit = self.out(out)  # (N, hidden_dim) -> (N, num_classes)
-        logit = torch.sigmoid(logit)
         return logit
