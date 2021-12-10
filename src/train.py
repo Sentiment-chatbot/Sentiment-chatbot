@@ -5,6 +5,7 @@ import wandb
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 from .utils.lr_scheduler import ModifiedCosineAnnealingWarmRestarts
 from .utils.metric import perplexity_score
@@ -177,3 +178,57 @@ def test(
         gen_policy,
         device
     )
+
+
+def train_classifier(
+    model,
+    classifier,
+    train_loader,
+    n_epochs,
+    device,
+    opt='adamw',
+    learning_rate=3e-4,
+    lr_scheduler='SGDR'
+):  
+
+    criterion = nn.CrossEntropyLoss()
+
+    # Optimizer
+    optimizer = None
+    if opt == 'adamw':
+        optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    else:
+        raise NotImplementedError
+
+    
+    model.to(device)
+    classifier.to(device)
+
+    total_loss = 0
+    train_loss = []
+
+    
+    for epoch in range(n_epochs):
+        epoch_loss = 0.0
+        model.train()
+        classifier.train()
+        for step, (q, _, _, e_1, _, seq_len) in enumerate(train_loader):
+            q, e_1 = q.to(device), e_1.to(device)
+            e_one_hot = []
+            for e in e_1:
+                temp = [0]*8
+                temp[e] = 1
+                e_one_hot.append(temp)
+            e_one_hot = torch.Tensor(e_one_hot).to(device)
+            optimizer.zero_grad()
+            # embed_q = model.get_input_embeddings(q)
+            logits = classifier(q, seq_len)
+
+            print(logits)
+
+            loss = criterion(logits, e_one_hot)
+            loss.backward()
+            optimizer.step()
+            epoch_loss += loss.item()
+            
+        print("[epoch_{}] train_loss : {}".format(epoch+1, (epoch_loss / (step + 1))))

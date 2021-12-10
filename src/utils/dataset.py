@@ -3,7 +3,7 @@ from collections import Counter
 import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
-from torch.nn.utils.rnn import pad_sequence
+from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence
 from soynlp.tokenizer import LTokenizer
 
 from .utils import get_num_workers
@@ -91,6 +91,8 @@ class DialogueDataset(Dataset):
         self.input_ids = []
         self.emotion_1 = df.emotion_1.tolist()
         self.emotion_2 = df.emotion_2.tolist()
+        self.seq_len = []
+
 
         q_set = tokenizer.encode(df.q.tolist())
         a_set = tokenizer.encode(df.a.tolist())
@@ -98,6 +100,8 @@ class DialogueDataset(Dataset):
             ids = [vocab.bos_token_id, vocab.sp1_token_id] + q \
                     + [vocab.sp2_token_id] + a + [vocab.eos_token_id]
             self.input_ids.append(ids)
+            self.seq_len.append(len(q))
+
 
         self.q_ids = q_set
 
@@ -106,7 +110,8 @@ class DialogueDataset(Dataset):
             torch.tensor(self.q_ids[idx]),
             torch.tensor(self.input_ids[idx]),
             torch.tensor(self.emotion_1[idx]),
-            torch.tensor(self.emotion_2[idx])
+            torch.tensor(self.emotion_2[idx]),
+            torch.tensor(self.seq_len[idx])
         )
         
     def __len__(self):
@@ -152,17 +157,22 @@ def load_data_loader(ds, pad_token_id, batch_size, shuffle=False):
             self.pad_token_id = pad_token_id
 
         def __call__(self, data):
-            q_ids, input_ids, emotion_1, emotion_2 = zip(*data)
+            q_ids, input_ids, emotion_1, emotion_2, seq_len = zip(*data)
             input_ids = pad_sequence(
                 input_ids,
+                batch_first=True,
+                padding_value=self.pad_token_id
+            ).long()
+            q_ids = pad_sequence(
+                q_ids, 
                 batch_first=True,
                 padding_value=self.pad_token_id
             ).long()
             attention_ids = (input_ids != pad_token_id).float()
             emotion_1 = torch.stack(emotion_1, dim=0)
             emotion_2 = torch.stack(emotion_2, dim=0)
-
-            return q_ids, input_ids, attention_ids, emotion_1, emotion_2
+            seq_len = torch.stack(seq_len, dim=0)
+            return q_ids, input_ids, attention_ids, emotion_1, emotion_2, seq_len
 
     num_workers = get_num_workers()
     data_loader = DataLoader(

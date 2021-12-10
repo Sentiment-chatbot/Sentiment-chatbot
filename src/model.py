@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.normalization import LayerNorm
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 from .utils import init_weight
 
@@ -254,20 +255,27 @@ class GPT2Model(nn.Module):
         return logits
 
 class emoClassifier(nn.Module):
-    def __init__(self, num_layers, hidden_dim, emb_dim, num_classes, batch_size, dropout):
+    def __init__(self, num_layers, hidden_dim, vocab_size, emb_dim, num_classes, dropout):
         super(emoClassifier, self).__init__()
         self.num_layers = num_layers
+        self.vocab_size = vocab_size
         self.hidden_dim = hidden_dim
-        self.batch_size = batch_size
-        self.lstm = nn.LSTM(emb_dim, self.hidden_dim,
+        self.emb_dim = emb_dim
+        self.embed = nn.Embedding(self.vocab_size, self.emb_dim)
+        self.lstm = nn.LSTM(self.emb_dim, self.hidden_dim,
                           num_layers=self.num_layers,
                           batch_first=True)
-        self.out = nn.Linear(self.hidden_dim, num_classes)
         self.dropout = nn.Dropout(p=dropout)
+        self.out = nn.Linear(self.hidden_dim, num_classes)
 
-    def forward(self, x):
-        x, _ = self.lstm(x)  # (N, seq_len, hidden_dim)
-        out = x[:,-1,:]  # (N, hidden_dim)
-        self.dropout(out)
+
+    def forward(self, x, seq_len):
+        x = self.embed(x)
+        packed_x = pack_padded_sequence(x, seq_len, batch_first=True, enforce_sorted=False)
+        out, _ = self.lstm(packed_x)  # (N, seq_len, hidden_dim)
+        out, _ = pad_packed_sequence(out, batch_first=True)
+        out = out[:,-1,:]  # (N, hidden_dim)
+        out = self.dropout(out)
         logit = self.out(out)  # (N, hidden_dim) -> (N, num_classes)
+        logit = torch.sigmoid(logit)
         return logit

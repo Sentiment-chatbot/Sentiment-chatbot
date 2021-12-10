@@ -7,7 +7,7 @@ import wandb
 
 from .model import GPT2Model, emoClassifier
 from .option import emoClassifierDefaultConfig, GPT2DefaultConfig, get_arg_parser
-from .train import train, test
+from .train import train, test, train_classifier
 from .utils import set_seed
 from .utils.tokenizer import Tokenizer
 from .utils.preprocessing import (
@@ -83,11 +83,24 @@ def main():
 
     # Loading model
     print("Get classifier...")
-    model = emoClassifier(**emoClassifierDefaultConfig, device=device)
-
+    classifier = emoClassifier(**emoClassifierDefaultConfig, vocab_size=len(vocab))
+    print("Finish. \n")
+    
     # Loading model
     print("Get model...")
     model = GPT2Model(**GPT2DefaultConfig, vocab_size=len(vocab), device=device)
+    print("Finish. \n")
+
+
+    # Train classifier
+    print("Train classifier...")
+    train_classifier(
+        model=model,
+        classifier=classifier,
+        train_loader=train_loader,
+        n_epochs=args.n_epochs,
+        device=device
+    )
 
     # Wandb link
     print("\n--Wandb initialization--")
@@ -143,4 +156,4 @@ if __name__ == '__main__':
     main()
 
 # python -m src.main --DEBUG --logging-step 5 --batch-size 2 --gen-policy top-p
-# python -m src.main --seed 42 --batch_size 64 --n-epochs 1 --learning-rate 1e-4
+# python -m src.main --seed 42 --batch-size 64 --n-epochs 5 --learning-rate 1e-4
