@@ -1,3 +1,5 @@
-soynlp
-wandb
-nltk
+numpy==1.20.1
+pandas==1.2.4
+wandb==0.12.7
+soynlp==0.0.493
+nltk==3.6.1

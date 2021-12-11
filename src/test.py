@@ -1,13 +1,11 @@
 import os
 import os.path as p
-from datetime import datetime
+import argparse
 
 import torch
-import wandb
 
 from .model import EmoGPT2
 from .option import GPT2DefaultConfig, EmoClassifierDefaultConfig, get_arg_parser
-from .train import train, test
 from .utils import set_seed
 from .utils.tokenizer import Tokenizer
 from .utils.preprocessing import (
@@ -16,14 +14,12 @@ from .utils.preprocessing import (
     make_vocab,
     get_vocab
 )
-from .utils.dataset import (
-    DialogueDataset, load_data_loader,
-    DialogueTestDataset, load_test_loader
-)
+from .utils.generate import generate_with_user_input
 
 
 def main():
     parser = get_arg_parser()
+    parser.add_argument('--weight-path', '-w', type=str, help='Path of model state weight')
     args = parser.parse_args()
     print(args)
 
@@ -67,20 +63,6 @@ def main():
     tokenizer = Tokenizer(vocab, args.base_tokenizer)
     print(f"Finish. Vocabulary size: {len(vocab)}\n")
 
-    # Loading dataset
-    print("Load datasets...")
-    train_ds = DialogueDataset(train_df, vocab, tokenizer)
-    valid_ds = DialogueDataset(valid_df, vocab, tokenizer)
-    test_ds = DialogueTestDataset(test_df, vocab, tokenizer)
-    print("Finish. \n")
-
-    # Loading dataloader
-    print("Load dataloaders...")
-    train_loader = load_data_loader(train_ds, vocab.pad_token_id, args.batch_size, shuffle=True)
-    valid_loader = load_data_loader(valid_ds, vocab.pad_token_id, args.batch_size, shuffle=False)
-    test_loader = load_test_loader(test_ds)
-    print("Finish. \n")
-
     # Loading model
     print("Get model...")
     model = EmoGPT2(
@@ -89,53 +71,30 @@ def main():
         tokenizer=tokenizer,
         device=device
     )
-
-    # Wandb link
-    print("\n--Wandb initialization--")
-    if args.debug:
-        print("DEBUGGING MODE - Start without wandb")
-        wandb.init(mode="disabled")
+    
+    if torch.cuda.is_available():
+        model.load_state_dict(torch.load(args.weight_path)['model_state_dict'])
     else:
-        print("Start train & test with wandb")
-        wandb.init(
-            project="Final project",
-            entity="skku-2021-2-ap-team15",
-        )
-        wandb.config.update(args)
-        wandb.run.name = datetime.now().strftime('%Y-%m-%d %H:%M')
-
-    # Start training
-    print("Start train.")
-    train(
-        model=model,
-        tokenizer=tokenizer,
-        train_loader=train_loader,
-        valid_loader=valid_loader,
-        n_epochs=args.n_epochs,
-        gen_max_seq_len=20,
-        gen_policy=args.gen_policy,
-        gen_ex_input=args.gen_ex_input,
-        device=device,
-        learning_rate=args.learning_rate,
-        logging_step=args.logging_step,
-    )
-    print("Finish.\n")
+        model.load_state_dict(torch.load(args.weight_path, map_location=torch.device('cpu'))['model_state_dict'])
+    print(f"Success to load the checkpoint: {args.weight_path}")
 
     # Start testing
     print("Start test.")
-    rouges, bleus, perplexity = test(
-        model=model,
-        test_loader=test_loader,
-        tokenizer=tokenizer,
-        gen_policy=args.gen_policy,
-        device=device
-    )
-
-    # Print metric scores
-    for i, (rouge, bleu) in enumerate(zip(rouges, bleus)):
-        print(f"BLEU-{i + 1}: {bleu: .4f} | ROUGE-{i + 1}: {rouge: .4f}")
-    print(f"Perplexity: {perplexity: .4f}")
-    print("Finish.\n")
+    user_input = input("Input(Want to get out? Please type 'STOP'): ")
+    while user_input != "STOP":
+        print(f"Generation ongoing...")
+        print(f"Input: {user_input}")
+        response_sentence = generate_with_user_input(
+            user_input=user_input,
+            max_seq_len=30,
+            model=model,
+            tokenizer=tokenizer,
+            gen_policy=args.gen_policy,
+            device=device
+        )
+        print(f"Output: {response_sentence}")
+        print(f"---------------------------")
+        user_input = input("Input(Want to get out? Please type 'STOP'): ")
 
     # Success
     print("All finished.")

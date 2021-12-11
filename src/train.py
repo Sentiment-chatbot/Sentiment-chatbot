@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from .option import Prompts
 from .utils.lr_scheduler import ModifiedCosineAnnealingWarmRestarts
 from .utils.metric import perplexity_score
 from .utils.generate import generate_with_user_input, generate_with_data_loader
@@ -19,7 +20,7 @@ def save_ckpt(ckpt_path, model, epoch, train_loss, best_loss):
         "best_loss" : best_loss
     }, ckpt_path)
     
-def validate(model, valid_loader, device):
+def validate(model, tokenizer, valid_loader, device):
     """ Validate with teacher forcing """
 
     criterion = nn.CrossEntropyLoss()
@@ -27,19 +28,32 @@ def validate(model, valid_loader, device):
 
     with torch.no_grad():
         epoch_loss = 0.0
-        for step, (_, input_ids, attention_ids, *_) in enumerate(valid_loader):
+        for step, (q_ids, q_lens, input_ids, attention_ids, emo_labels, _) in enumerate(valid_loader):
             # input_ids: (batched) <s> <sp1> {sentence1} <sp2> {sentence2} </s>
             # attention_ids: [1, 1, 1, 1, 1, ..., 0, 0]
-            # Other(*_): emotion labels
+            q_ids, q_lens = q_ids.to(device), q_lens.to(device)
             input_ids, attention_ids = input_ids.to(device), attention_ids.to(device) # (N, max_seq_len)
-            labels = input_ids[:, 1:].contiguous() # labels: (N, seq_len - 1)
+            lm_labels = input_ids[:, 1:].contiguous() # labels: (N, seq_len - 1)
+            emo_labels = emo_labels.to(device)
 
-            logits = model(input_ids=input_ids, attention_ids=attention_ids) # (N, seq_len, vocab_size)
-            logits = logits[:, :-1, :].contiguous() # (N, seq_len - 1, vocab_size)
-            
-            loss = criterion(logits.view(-1, logits.size(-1)), labels.view(-1))
-    
-            epoch_loss += loss.item()
+            # Forward
+            emo_logits, lm_logits = model(
+                q_ids=q_ids,
+                q_lens=q_lens,
+                input_ids=input_ids,
+                attention_ids=attention_ids,
+                emo_labels=emo_labels # teacher forcing
+            ) # (N, seq_len, vocab_size)
+
+            lm_labels = torch.cat([
+                torch.tensor(tokenizer.vocab.emo_token_id, device=device).repeat(lm_labels.size(0), 1),
+                emo_labels.view(lm_labels.size(0), 1),
+                lm_labels
+            ], dim=1)
+            lm_logits = lm_logits[:, :-1, :].contiguous() # (N, seq_len - 1, vocab_size)
+            lm_loss = criterion(lm_logits.view(-1, lm_logits.size(-1)), lm_labels.view(-1))
+
+            epoch_loss += lm_loss.item()
 
         valid_loss = epoch_loss / len(valid_loader)
 
@@ -81,16 +95,17 @@ def train(
     # Optimizer
     optimizer = None
     if opt == 'adamw':
-        optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+        cls_optimizer = torch.optim.AdamW(model.emo_classifier.parameters(), lr=learning_rate)
+        lm_optimizer = torch.optim.AdamW(model.gpt.parameters(), lr=learning_rate)
     else:
         raise NotImplementedError
 
     # Learning scheduler
-    scheduler = None
-    if lr_scheduler == 'SGDR':
-        scheduler = ModifiedCosineAnnealingWarmRestarts(
-            optimizer, T_0=n_epochs // 10, T_up=n_epochs // 20, T_mult=1, eta_max=0.1, gamma=0.5
-        )
+    # scheduler = None
+    # if lr_scheduler == 'SGDR':
+    #     scheduler = ModifiedCosineAnnealingWarmRestarts(
+    #         optimizer, T_0=n_epochs // 10, T_up=n_epochs // 20, T_mult=1, eta_max=0.1, gamma=0.5
+    #     )
 
     losses = []
     train_loss = []
@@ -100,26 +115,43 @@ def train(
     for epoch in range(n_epochs):
         model.train()
         epoch_loss = 0.0
-        for step, (_, input_ids, attention_ids, *_) in enumerate(train_loader):
+        for step, (q_ids, q_lens, input_ids, attention_ids, emo_labels, _) in enumerate(train_loader):
             # input_ids: (batched) <s> <sp1> {sentence1} <sp2> {sentence2} </s>
             # attention_ids: [1, 1, 1, 1, 1, ..., 0, 0]
-            # Other(*_): emotion labels
+            q_ids, q_lens = q_ids.to(device), q_lens.to(device)
             input_ids, attention_ids = input_ids.to(device), attention_ids.to(device) # (N, max_seq_len)
-            labels = input_ids[:, 1:].contiguous() # labels: (N, seq_len - 1)
+            lm_labels = input_ids[:, 1:].contiguous() # labels: (N, seq_len - 1)
+            emo_labels = emo_labels.to(device)
 
-            optimizer.zero_grad()
+            # Forward
+            emo_logits, lm_logits = model(
+                q_ids=q_ids,
+                q_lens=q_lens,
+                input_ids=input_ids,
+                attention_ids=attention_ids,
+                emo_labels=emo_labels # teacher forcing
+            ) # (N, seq_len, vocab_size)
 
-            logits = model(input_ids=input_ids, attention_ids=attention_ids) # (N, seq_len, vocab_size)
-            logits = logits[:, :-1, :].contiguous() # (N, seq_len - 1, vocab_size)
+            # Backprop. (Classifier)
+            cls_optimizer.zero_grad()
+            cls_loss = criterion(emo_logits, emo_labels)
+            cls_loss.backward()
+            cls_optimizer.step()
 
-            loss = criterion(logits.view(-1, logits.size(-1)), labels.view(-1))
-            loss.backward()
+            # Backprop. (Language model (GPT))
+            lm_labels = torch.cat([
+                torch.tensor(tokenizer.vocab.emo_token_id, device=device).repeat(lm_labels.size(0), 1),
+                emo_labels.view(lm_labels.size(0), 1),
+                lm_labels
+            ], dim=1)
+            lm_optimizer.zero_grad()
+            lm_logits = lm_logits[:, :-1, :].contiguous() # (N, seq_len - 1, vocab_size)
+            lm_loss = criterion(lm_logits.view(-1, lm_logits.size(-1)), lm_labels.view(-1))
+            lm_loss.backward()
+            lm_optimizer.step()
 
-            optimizer.step()
-
-            epoch_loss += loss.item()
-
-            # Wandb logging
+            # Logging
+            epoch_loss += lm_loss.item()
             wandb.log({
                 "train_loss": epoch_loss / (step + 1),
                 "train_ppl": perplexity_score(epoch_loss / (step + 1))
@@ -128,9 +160,9 @@ def train(
             if (step + 1) % logging_step == 0:
                 print(f"[Epoch {epoch + 1}/{n_epochs}] Step {step  + 1}/{len(train_loader)} | loss: {epoch_loss/(step + 1): .3f}")
 
-        scheduler.step()
+        # scheduler.step()
         train_loss.append(epoch_loss / len(train_loader))
-        valid_loss, valid_ppl = validate(model, valid_loader, device)
+        valid_loss, valid_ppl = validate(model, tokenizer, valid_loader, device)
     
         if valid_ppl < best_ppl:
             best_ppl = valid_ppl
@@ -157,7 +189,7 @@ def train(
 
         # Wandb logging
         wandb.log({
-            "learning_rate": scheduler.get_last_lr()[0],
+            # "learning_rate": scheduler.get_last_lr()[0],
             "valid_loss": valid_loss,
             "valid_ppl": valid_ppl,
             "generated": f"Input: {gen_ex_input} / Output: {response_sentence}"
