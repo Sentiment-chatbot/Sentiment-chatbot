@@ -7,11 +7,13 @@ We used the [Emotional dialogue corpus](https://aihub.or.kr/aidata/7978) dataset
 
 ## How to use
 At root dir,
-- Train
+- Train  
 `python -m src.main`
 
-- Test (test with your input)
+- Test (test with your input)  
 `python -m src.test --weight-path [WEIGHT PATH]`  
+
+
 **CAUTION: There are occasional errors in input recognition, so proper output can be obtained only by entering input without typos at a time.**
 
 You can adjust the train setting by arguments. (See below)
@@ -30,10 +32,9 @@ You can adjust the train setting by arguments. (See below)
 
 ## Requirements
 ### Dependencies
-- Python 3.7+
-- PyTorch 1.10.0  
+Python 3.7+  
+PyTorch 1.10.0  
    
-  
 - numpy==1.20.1
 - pandas==1.2.4
 - wandb==0.12.7
