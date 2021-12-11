@@ -1,1 +1,0 @@
-python -m src.main --batch-size 128 --n-epochs 7

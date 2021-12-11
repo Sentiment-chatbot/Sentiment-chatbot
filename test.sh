@@ -1,0 +1,1 @@
+python -m src.test --weight-path ./ckpt/checkpoint_epoch_8.pt
