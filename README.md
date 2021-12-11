@@ -1,7 +1,7 @@
 # Sentiment (Emotion) Chatbot
 This is a simple single-turn chatbot for Korean emotional dialogue. We implemented and trained GPT-2 base model **from scratch**. Furthermore, we used a technique that predicts the emotion for the user input and utilized it as a prompt.
 
-We used the [Emotional dialogue corpus](https://aihub.or.kr/aidata/7978) dataset provided by AI Hub.
+We used the [Emotional dialogue corpus](https://aihub.or.kr/aidata/7978) dataset provided by AI Hub. Data files are available in `./data/raw`. Our code will pre-process and store them on `./data/processed`.
 
 \* This repository contains the source code of the Team 15 of Artificial Intelligence Project (SWE3032-41, 2021Fall) at SKKU.
 
