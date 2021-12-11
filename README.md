@@ -11,7 +11,7 @@ At root dir,
 `python -m src.main`
 
 - Test (test with your input)
-`python -m src.test --weight-dir [WEIGHT PATH]`
+`python -m src.test --weight-path [WEIGHT PATH]`
 
 You can adjust the train setting by arguments. (See below)
 

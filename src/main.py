@@ -5,7 +5,7 @@ from datetime import datetime
 import torch
 import wandb
 
-from .model import EmoGPT2, GPT2Model
+from .model import EmoGPT2
 from .option import GPT2DefaultConfig, EmoClassifierDefaultConfig, get_arg_parser
 from .train import train, test
 from .utils import set_seed
