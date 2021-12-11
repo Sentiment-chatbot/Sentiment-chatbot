@@ -257,7 +257,6 @@ class GPT2Model(nn.Module):
 
         return logits
 
-<<<<<<< HEAD
 
 class EmoClassifier(nn.Module):
     """ 
@@ -375,29 +374,3 @@ class EmoGPT2(nn.Module):
         lm_logits = self.gpt(input_ids, attention_ids)
 
         return emo_logits, lm_logits
-=======
-class emoClassifier(nn.Module):
-    def __init__(self, num_layers, hidden_dim, vocab_size, emb_dim, num_classes, dropout):
-        super(emoClassifier, self).__init__()
-        self.num_layers = num_layers
-        self.vocab_size = vocab_size
-        self.hidden_dim = hidden_dim
-        self.emb_dim = emb_dim
-        self.embed = nn.Embedding(self.vocab_size, self.emb_dim)
-        self.lstm = nn.LSTM(self.emb_dim, self.hidden_dim,
-                          num_layers=self.num_layers,
-                          batch_first=True)
-        self.dropout = nn.Dropout(p=dropout)
-        self.out = nn.Linear(self.hidden_dim, num_classes)
-
-
-    def forward(self, x, seq_len):
-        x = self.embed(x)
-        packed_x = pack_padded_sequence(x, seq_len, batch_first=True, enforce_sorted=False)
-        out, _ = self.lstm(packed_x)  # (N, seq_len, hidden_dim)
-        out, _ = pad_packed_sequence(out, batch_first=True)
-        out = out[:,-1,:]  # (N, hidden_dim)
-        out = self.dropout(out)
-        logit = self.out(out)  # (N, hidden_dim) -> (N, num_classes)
-        return logit
->>>>>>> 57ad5dbf18ed9016a0ef3e285d458bca373fa0d4
