@@ -19,16 +19,15 @@ def greedy_search(model, q_ids, q_lens, input_ids):
     """
 
     with torch.no_grad():
-        emo_out, out = model(
+        _, out = model(
             q_ids=q_ids,
             q_lens=q_lens,
             input_ids=input_ids
         ) # (1, seq_len, vocab_size)
         logits = out.squeeze(0)[-1, :] # (vocab_size)
         pred = torch.argmax(logits) # (1)
-        emo_pred = torch.argmax(emo_out, dim=1).item()
 
-    return emo_pred, pred, logits
+    return pred, logits
 
 # TODO Not fully implemented
 # def top_p_sampling(model, input_ids, p=0.9):
@@ -132,7 +131,7 @@ def generate_with_user_input(
     # pred: {sentence2} </s>
     pred_ids = []
     for _ in range(max_seq_len):
-        _, pred, logits = generate_fn(model, q_ids, q_lens, input_ids)
+        pred, logits = generate_fn(model, q_ids, q_lens, input_ids)
         if(pred.item() == tokenizer.vocab.eos_token_id):
             break
         pred_ids.append(pred.item())
@@ -177,7 +176,6 @@ def generate_with_data_loader(
     perplexities = []
     epoch_loss = 0.0
 
-    emo_correct = 0
     for step, (q_ids, q_lens, input_ids, input_raws, label_ids, label_raws, emo_label) in enumerate(test_loader):
         q_ids, q_lens = q_ids.to(device), q_lens.to(device)
         input_ids, label_ids = input_ids.to(device), label_ids.to(device) # (1, q_len), (1, a_len)
@@ -185,7 +183,7 @@ def generate_with_data_loader(
         pred_ids = []
         pred_logits = []
         while len(pred_ids) != label_ids.size(-1):
-            emo_pred, pred, logits = generate_fn(model, q_ids, q_lens, input_ids) # single index
+            pred, logits = generate_fn(model, q_ids, q_lens, input_ids) # single index
             pred_logits.append(logits)
             pred_ids.append(pred.item())
             input_ids = torch.cat((input_ids, pred.view(1, 1)), dim=-1)
@@ -194,8 +192,6 @@ def generate_with_data_loader(
         input_sentences.append(input_raws[0])
         label_sentences.append(label_raws[0])
 
-        if emo_pred == emo_label:
-            emo_correct += 1
         cross_entropy = F.cross_entropy(
             input=torch.stack(pred_logits, dim=0), # (a_len, vocab_size)
             target=label_ids.squeeze(0) # (a_len)
@@ -225,5 +221,5 @@ def generate_with_data_loader(
         print(f"Output: {pred_sentences[idx]}")
         print(f"Label: {label_sentences[idx]}")    
         print("-------")
-    print(f"Emotion ACC: {emo_correct / len(test_loader.dataset):.3f}")
+
     return rouges, bleus, perplexity

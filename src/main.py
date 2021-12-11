@@ -42,7 +42,7 @@ def main():
         and p.exists(p.join(data_root, "valid.csv"))
         and p.exists(p.join(data_root, "test.csv"))
     ):
-        print("Proprocessing...")
+        print("Preprocessing...")
         make_dataframe(src_path=args.data_path, dst_path=data_root)
         print("Finish.\n")
     else:
