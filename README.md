@@ -11,7 +11,8 @@ At root dir,
 `python -m src.main`
 
 - Test (test with your input)
-`python -m src.test --weight-path [WEIGHT PATH]`
+`python -m src.test --weight-path [WEIGHT PATH]`  
+**CAUTION: There are occasional errors in input recognition, so proper output can be obtained only by entering input without typos at a time.**
 
 You can adjust the train setting by arguments. (See below)
 
