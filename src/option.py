@@ -51,9 +51,9 @@ def get_arg_parser():
     parser.add_argument('--data-path', '-r', type=str, default="data/",
                         help='Data path')
     parser.add_argument('--base-tokenizer', '-bt', type=str, default="Ltokenizer",
-                        help='Tokenizer type, option: Ltokenizer, Mecab')
+                        help='Tokenizer type, option: Ltokenizer')
     parser.add_argument('--gen-policy', '-gp', type=str, default="greedy",
-                        help='Teneration policy, option: greedy, top-p')
+                        help='Generation policy, option: greedy, top-p')
     parser.add_argument('--gen-ex-input', '-gei', type=str, default="나 요즘 너무 우울해.",
                         help='Sample input (ex. --gen-ex-input "나 요즘 너무 우울해.")')
     parser.add_argument('--logging-step', '-ls', type=int, default=150,
