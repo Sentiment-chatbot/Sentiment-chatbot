@@ -72,6 +72,7 @@ def main():
     train_ds = DialogueDataset(train_df, vocab, tokenizer)
     valid_ds = DialogueDataset(valid_df, vocab, tokenizer)
     test_ds = DialogueTestDataset(test_df, vocab, tokenizer)
+    cls_test_ds = DialogueDataset(test_df, vocab, tokenizer)
     print("Finish. \n")
 
     # Loading dataloader
@@ -79,8 +80,14 @@ def main():
     train_loader = load_data_loader(train_ds, vocab.pad_token_id, args.batch_size, shuffle=True)
     valid_loader = load_data_loader(valid_ds, vocab.pad_token_id, args.batch_size, shuffle=False)
     test_loader = load_test_loader(test_ds)
+    cls_test_loader = load_data_loader(cls_test_ds, vocab.pad_token_id, args.batch_size, shuffle=False)
     print("Finish. \n")
 
+    # Loading model
+    print("Get classifier...")
+    classifier = emoClassifier(**emoClassifierDefaultConfig, vocab_size=len(vocab))
+    print("Finish. \n")
+    
     # Loading model
     print("Get model...")
     model = EmoGPT2(

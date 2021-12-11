@@ -47,12 +47,21 @@ def convert_ngram_tokens(tokens, n):
         for i in range(len(tokens)):
             n_token += tokens[i]
         n_gram_tokens.append(n_token)
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 57ad5dbf18ed9016a0ef3e285d458bca373fa0d4
     else:
         for i in range(len(tokens) - (n - 1)):
             n_token = ""
             for j in range(n):
                 n_token += tokens[i + j]
                 n_gram_tokens.append(n_token)
+<<<<<<< HEAD
 
     return n_gram_tokens
+=======
+                
+    return n_gram_tokens
+>>>>>>> 57ad5dbf18ed9016a0ef3e285d458bca373fa0d4

@@ -3,7 +3,7 @@ from collections import Counter
 import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
-from torch.nn.utils.rnn import pad_sequence
+from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence
 from soynlp.tokenizer import LTokenizer
 
 from .utils import get_num_workers
@@ -92,7 +92,9 @@ class DialogueDataset(Dataset):
 
         self.input_ids = []
         self.emotion_1 = df.emotion_1.tolist()
-        self.emotion_2 = df.emotion_2.tolist()
+        # self.emotion_2 = df.emotion_2.tolist()
+        self.seq_len = []
+
 
         q_set = tokenizer.encode(df.q.tolist())
         a_set = tokenizer.encode(df.a.tolist())
@@ -100,6 +102,16 @@ class DialogueDataset(Dataset):
             ids = [vocab.bos_token_id, vocab.sp1_token_id] + q \
                     + [vocab.sp2_token_id] + a + [vocab.eos_token_id]
             self.input_ids.append(ids)
+            self.seq_len.append(len(q))
+        
+        self.binary_emo = []
+        for e in self.emotion_1:
+            if e != 4:
+                self.binary_emo.append(0)
+            else:
+                self.binary_emo.append(1)
+                
+
 
         self.q_ids = q_set
         self.q_lens = [len(q) for q in q_set]
@@ -110,7 +122,8 @@ class DialogueDataset(Dataset):
             torch.tensor(self.q_lens[idx]),
             torch.tensor(self.input_ids[idx]),
             torch.tensor(self.emotion_1[idx]),
-            torch.tensor(self.emotion_2[idx])
+            torch.tensor(self.binary_emo[idx]),
+            torch.tensor(self.seq_len[idx])
         )
         
     def __len__(self):

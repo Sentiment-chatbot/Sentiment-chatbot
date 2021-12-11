@@ -5,6 +5,7 @@ import wandb
 import numpy as np
 import torch
 import torch.nn as nn
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 from .option import Prompts
 from .utils.lr_scheduler import ModifiedCosineAnnealingWarmRestarts
@@ -209,3 +210,98 @@ def test(
         gen_policy,
         device
     )
+
+def save_classifier_ckpt(ckpt_path, classifier, epoch, best_loss):
+    torch.save({
+        "epoch": epoch,
+        "classifier_state_dict" : classifier.state_dict(),
+        "best_loss" : best_loss
+    }, ckpt_path)
+
+def train_classifier(
+    classifier,
+    train_loader,
+    n_epochs,
+    device,
+    opt='adamw',
+    learning_rate=0.01,
+    lr_scheduler='SGDR',
+    ckpt_path='./ckpt'
+):  
+
+    criterion = nn.CrossEntropyLoss()
+
+    # Optimizer
+    optimizer = None
+    if opt == 'adamw':
+        optimizer = torch.optim.AdamW(classifier.parameters(), lr=learning_rate)
+    else:
+        raise NotImplementedError
+
+    checkpoint = torch.load(p.join(ckpt_path, f"cls_checkpoint_epoch_{17}.pt"))
+    classifier.load_state_dict(checkpoint['classifier_state_dict'])
+    best_loss = checkpoint['best_loss']
+    classifier.to(device)
+
+
+    total_loss = 0
+    train_loss = []
+    
+    for epoch in range(n_epochs):
+        epoch_loss = 0.0
+        classifier.train()
+        for step, (q, _, _, _, b, seq_len) in enumerate(train_loader):
+            q, b = q.to(device), b.to(device)
+            e_one_hot = []
+            for e in b:
+                temp = [0]*2
+                temp[e] = 1
+                e_one_hot.append(temp)
+            e_one_hot = torch.Tensor(e_one_hot).to(device)
+            optimizer.zero_grad()
+            logits = classifier(q, seq_len)
+
+            loss = criterion(logits, e_one_hot)
+            loss.backward()
+            optimizer.step()
+            epoch_loss += loss.item()
+
+        print("[epoch_{}] train_loss : {}".format(epoch+1, (epoch_loss / (step + 1))))
+
+        if (best_loss > (epoch_loss / (step + 1))):
+            best_loss = (epoch_loss / (step + 1))
+            print("save_classifier")
+            save_classifier_ckpt(
+                ckpt_path=p.join(ckpt_path, f"cls_checkpoint_epoch_{epoch + 1}.pt"), 
+                classifier=classifier, 
+                epoch=epoch + 1, 
+                best_loss=best_loss
+            )
+            
+def test_classifier(
+    classifier, 
+    test_loader, 
+    device,
+    ckpt_path='./ckpt'
+    ):
+    classifier.eval()
+    test_total = 0
+    test_correct = 0
+
+    checkpoint = torch.load(p.join(ckpt_path, f"cls_checkpoint_epoch_{17}.pt"))
+    classifier.load_state_dict(checkpoint['classifier_state_dict'])
+    classifier.to(device)
+
+    with torch.no_grad():
+        for step, (q, _, _, _, b, seq_len) in enumerate(test_loader):
+            q, b = q.to(device), b.to(device)
+            logits = classifier(q, seq_len)
+            _, predicted = torch.max(logits, 1)
+            test_total += len(b)
+            test_correct += (predicted == b).sum().item()
+            test_acc = test_correct / test_total
+            
+
+        print("Classifier Test Acc. : {}".format(test_acc*100))
+
+    return
