@@ -19,15 +19,16 @@ def greedy_search(model, q_ids, q_lens, input_ids):
     """
 
     with torch.no_grad():
-        _, out = model(
+        emo_out, out = model(
             q_ids=q_ids,
             q_lens=q_lens,
             input_ids=input_ids
-        ) # (1, seq_len, vocab_size) 
+        ) # (1, seq_len, vocab_size)
         logits = out.squeeze(0)[-1, :] # (vocab_size)
         pred = torch.argmax(logits) # (1)
+        emo_pred = torch.argmax(emo_out, dim=1).item()
 
-    return pred, logits
+    return emo_pred, pred, logits
 
 # TODO Not fully implemented
 # def top_p_sampling(model, input_ids, p=0.9):
@@ -130,14 +131,13 @@ def generate_with_user_input(
     # input_ids: <s> <sp1> {sentence1} <sp2>
     # pred: {sentence2} </s>
     pred_ids = []
-    with torch.no_grad():
-        for _ in range(max_seq_len):
-            pred, logits = generate_fn(model, q_ids, q_lens, input_ids)
-            if(pred.item() == tokenizer.vocab.eos_token_id):
-                break
-            pred_ids.append(pred.item())
+    for _ in range(max_seq_len):
+        _, pred, logits = generate_fn(model, q_ids, q_lens, input_ids)
+        if(pred.item() == tokenizer.vocab.eos_token_id):
+            break
+        pred_ids.append(pred.item())
 
-            input_ids = torch.cat((input_ids, pred.view(1, 1)), dim=-1)
+        input_ids = torch.cat((input_ids, pred.view(1, 1)), dim=-1)
 
     pred_sentence = tokenizer.decode(pred_ids)
     return pred_sentence
@@ -176,17 +176,22 @@ def generate_with_data_loader(
     label_sentences = []
     perplexities = []
     epoch_loss = 0.0
-    for step, (input_ids, input_raws, label_ids, label_raws) in enumerate(test_loader):
+    
+    emo_correct = 0
+    for step, (q_ids, q_lens, input_ids, input_raws, label_ids, label_raws, emo_label) in enumerate(test_loader):
+        q_ids, q_lens = q_ids.to(device), q_lens.to(device)
         input_ids, label_ids = input_ids.to(device), label_ids.to(device) # (1, q_len), (1, a_len)
 
         pred_ids = []
         pred_logits = []
         while len(pred_ids) != label_ids.size(-1):
-            pred, logits = generate_fn(model, input_ids) # single index
+            emo_pred, pred, logits = generate_fn(model, q_ids, q_lens, input_ids) # single index
             pred_logits.append(logits)
             pred_ids.append(pred.item())
             input_ids = torch.cat((input_ids, pred.view(1, 1)), dim=-1)
 
+        if emo_pred == emo_label:
+            emo_correct += 1
         pred_sentences.append(tokenizer.decode(pred_ids))
         input_sentences.append(input_raws[0])
         label_sentences.append(label_raws[0])
@@ -220,5 +225,7 @@ def generate_with_data_loader(
         print(f"Output: {pred_sentences[idx]}")
         print(f"Label: {label_sentences[idx]}")    
         print("-------")
+
+    print(f"Emotion ACC: {emo_correct / len(test_loader.dataset):.3f}")
 
     return rouges, bleus, perplexity

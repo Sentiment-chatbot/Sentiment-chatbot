@@ -6,8 +6,12 @@ We used the [Emotional dialogue corpus](https://aihub.or.kr/aidata/7978) dataset
 \* This repository contains the source code of the Team 15 of Artificial Intelligence Project (SWE3032-41, 2021Fall) at SKKU.
 
 ## How to use
-At root dir,  
+At root dir,
+- Train
 `python -m src.main`
+
+- Test (test with your input)
+`python -m src.test --weight-dir [WEIGHT PATH]`
 
 You can adjust the train setting by arguments. (See below)
 
@@ -44,6 +48,7 @@ pip install -r requirements.txt
 ```
 ./src
 ├── main.py - main (execute)
+├── test.py - test (execute with your own input)
 ├── model.py - contain all models
 ├── option.py - options (arguments, model configs, etc.)
 ├── train.py - train/eval/test
