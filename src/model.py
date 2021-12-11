@@ -359,7 +359,7 @@ class EmoGPT2(nn.Module):
         batch_size = input_ids.size(0)
         input_ids = torch.cat([
             input_ids[:, :1],
-            torch.tensor(self.emo_token_id).repeat(batch_size, 1),
+            torch.tensor(self.emo_token_id, device=self.device).repeat(batch_size, 1),
             emo_prompts.view(batch_size, 1),
             input_ids[:, 1:]
         ], dim=1)
@@ -367,7 +367,7 @@ class EmoGPT2(nn.Module):
         if attention_ids is not None:
             attention_ids = torch.cat([
                 attention_ids[:, :1], 
-                torch.ones(batch_size, 2),
+                torch.ones(batch_size, 2, device=self.device),
                 attention_ids[:, 1:]
             ], dim=1)
 
