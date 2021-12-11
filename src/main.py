@@ -5,8 +5,8 @@ from datetime import datetime
 import torch
 import wandb
 
-from .model import GPT2Model
-from .option import GPT2DefaultConfig, get_arg_parser
+from .model import EmoGPT2, GPT2Model
+from .option import GPT2DefaultConfig, EmoClassifierDefaultConfig, get_arg_parser
 from .train import train, test
 from .utils import set_seed
 from .utils.tokenizer import Tokenizer
@@ -73,7 +73,7 @@ def main():
     valid_ds = DialogueDataset(valid_df, vocab, tokenizer)
     test_ds = DialogueTestDataset(test_df, vocab, tokenizer)
     print("Finish. \n")
-    
+
     # Loading dataloader
     print("Load dataloaders...")
     train_loader = load_data_loader(train_ds, vocab.pad_token_id, args.batch_size, shuffle=True)
@@ -83,7 +83,12 @@ def main():
 
     # Loading model
     print("Get model...")
-    model = GPT2Model(**GPT2DefaultConfig, vocab_size=len(vocab), device=device)
+    model = EmoGPT2(
+        **GPT2DefaultConfig,
+        emo_classifier_conf=EmoClassifierDefaultConfig,
+        tokenizer=tokenizer,
+        device=device
+    )
 
     # Wandb link
     print("\n--Wandb initialization--")
@@ -138,5 +143,5 @@ def main():
 if __name__ == '__main__':
     main()
 
-# python -m src.main --DEBUG --logging-step 5 --batch-size 2 --gen-policy top-p
+# python -m src.main --DEBUG --logging-step 5 --batch-size 2 --gen-policy greedy
 # python -m src.main --seed 42 --batch_size 64 --epoch 1 --learning-rate 1e-4

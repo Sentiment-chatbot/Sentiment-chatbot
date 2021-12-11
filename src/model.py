@@ -4,9 +4,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.normalization import LayerNorm
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 from .utils import init_weight
-
+from .option import Prompts, Prompt_idx2word
 
 class Attention(nn.Module):
     """ Multi-head attention """
@@ -207,7 +208,7 @@ class GPT2Model(nn.Module):
 
     def forward(self, input_ids, attention_ids=None):
         """
-        Arg:
+        Args:
             input_ids: (N, seq_len)
             attention_ids: (N, seq_len)
 
@@ -233,6 +234,9 @@ class GPT2Model(nn.Module):
                 decoded: 
                     '▁날씨가', '▁굉', '장', '히', '▁화', '창', '하', '네', '?'
                     '▁정말', '▁그렇', '네', '요.', '<pad>', '<pad>', '<pad>', '<pad>', '<pad>'
+            
+            Since we also used special tokens, real input_ids is like below.
+            <s> <sp1> '▁날씨가', '▁굉', '장', '히', '▁화', '창', '하', '네', '?' <sp2> '▁정말', '▁그렇', '네', '요.' </s>
         Return:
             logits: (N, seq_len, vocab_size)
             Each of the logits indicate a confidence of each word for each position
@@ -252,3 +256,120 @@ class GPT2Model(nn.Module):
         logits = self.fc(self.layer_norm(logits)) # (N, seq_len, vocab_size)
 
         return logits
+
+
+class EmoClassifier(nn.Module):
+    """ 
+        Emotion classifier with (bidirectional) LSTM
+    """
+    def __init__(self, num_layers, emb_dim, hidden_dim, num_classes, dropout, bidirectional):
+        super().__init__()
+        self.lstm = nn.LSTM(
+            input_size=emb_dim, 
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            bidirectional=True,
+            batch_first=True
+        )
+        self.dropout = nn.Dropout(p=dropout)
+        self.fc = nn.Linear(
+            in_features=hidden_dim * (2 if bidirectional else 1),
+            out_features=num_classes
+        )
+
+    def forward(self, input_embed, seq_len): 
+        """
+        Args:
+            input_embed: (N, seq_len, emb_dim)
+            seq_len: (N) (length of each sequence, excluding padded part)
+
+        Return:
+            logits: (N, C(6))
+            Emotion logits
+        """
+        packed_embed = pack_padded_sequence(input_embed, seq_len.cpu(), batch_first=True, enforce_sorted=False)
+        out, _ = self.lstm(packed_embed)
+        out, _ = pad_packed_sequence(out, batch_first=True) # (N, seq_len, hidden_dim)
+        out = out[:,-1,:]  # (N, hidden_dim)
+        logits = self.fc(self.dropout(out)) # (N, hidden_dim) -> (N, C)
+
+        return logits
+
+
+class EmoGPT2(nn.Module):
+    """ 
+        GPT2Model with emotion classifer & emotion prompt
+    """
+    def __init__(
+        self,
+        emb_dim,
+        max_seq_len,
+        num_heads,
+        num_layers,
+        dropout,
+        emo_classifier_conf,
+        tokenizer,
+        device
+    ):
+        super().__init__()
+        self.gpt = GPT2Model(
+            len(tokenizer.vocab),
+            emb_dim, max_seq_len, num_heads, num_layers,
+            dropout, device
+        )
+        self.emo_classifier = EmoClassifier(**emo_classifier_conf)
+        self.emo_token_id = tokenizer.vocab.emo_token_id
+        
+        self.device = device
+
+    def get_input_embeddings(self):
+        return self.token_embs
+
+    def set_input_embeddings(self, embeddings):
+        self.token_embs = embeddings
+
+    def forward(self, q_ids, q_lens, input_ids, attention_ids=None, emo_labels=None):
+        """
+        Args:
+            q_ids: (N, seq_len)
+            q_lens: (N)
+            input_ids: (N, seq_len)
+            attention_ids: (N, seq_len)
+            emo_labels: (N) => used when appling teacher forcing
+
+        Return:
+            logits: (N, seq_len, vocab_size)
+            Each of the logits indicate a confidence of each word for each position
+            
+        Example:
+        <s> <emo> 기쁨 <sp1> '▁날씨가', '▁굉', '장', '히', '▁화', '창', '하', '네', '?' <sp2> '▁정말', '▁그렇', '네', '요.' </s>
+        """
+        
+        # Emotion classifier (LSTM)
+        q_input_embs = self.gpt.dropout(self.gpt.token_embs(q_ids))
+        emo_logits = self.emo_classifier(q_input_embs, q_lens)
+        emo_pred = torch.argmax(emo_logits, dim=-1) # (N)
+        
+        emo_prompts = torch.tensor(
+            [Prompts[x] for x in (emo_pred.cpu().tolist() if emo_labels is None 
+                            else emo_labels.cpu().tolist())], device=self.device
+        )
+
+        # GPT
+        batch_size = input_ids.size(0)
+        input_ids = torch.cat([
+            input_ids[:, :1],
+            torch.tensor(self.emo_token_id).repeat(batch_size, 1),
+            emo_prompts.view(batch_size, 1),
+            input_ids[:, 1:]
+        ], dim=1)
+
+        attention_ids = torch.cat([
+            attention_ids[:, :1], 
+            torch.ones(batch_size, 2),
+            attention_ids[:, 1:]
+        ], dim=1)
+
+        lm_logits = self.gpt(input_ids, attention_ids)
+
+        return emo_logits, lm_logits

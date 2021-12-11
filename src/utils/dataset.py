@@ -27,6 +27,7 @@ class Vocabulary(object):
         self.add_word("<unk>")
         self.add_word("<sp1>")
         self.add_word("<sp2>")
+        self.add_word("<emo>")
 
         self.bos_token_id = self.word2idx["<s>"]
         self.eos_token_id = self.word2idx["</s>"]
@@ -34,6 +35,7 @@ class Vocabulary(object):
         self.unk_token_id = self.word2idx["<unk>"]
         self.sp1_token_id = self.word2idx["<sp1>"]
         self.sp2_token_id = self.word2idx["<sp2>"]
+        self.emo_token_id = self.word2idx["<emo>"]
 
     def add_word(self, word):
         if not word in self.word2idx:
@@ -77,10 +79,10 @@ class DialogueDataset(Dataset):
     """ Dialogue dataset for train/valid """
     def __init__(self, df, vocab, tokenizer):
         super().__init__()
-        emotion_1_types = df.emotion_1.unique()
+        emotion_1_types = sorted(df.emotion_1.unique())
         emotion_1_dict = {name: i for i, name in enumerate(emotion_1_types)}
         
-        emotion_2_types = df.emotion_2.unique()
+        emotion_2_types = sorted(df.emotion_2.unique())
         emotion_2_dict = {name: i for i, name in enumerate(emotion_2_types)}
 
         df = df.replace({
@@ -100,10 +102,12 @@ class DialogueDataset(Dataset):
             self.input_ids.append(ids)
 
         self.q_ids = q_set
+        self.q_lens = [len(q) for q in q_set]
 
     def __getitem__(self, idx):
         return (
             torch.tensor(self.q_ids[idx]),
+            torch.tensor(self.q_lens[idx]),
             torch.tensor(self.input_ids[idx]),
             torch.tensor(self.emotion_1[idx]),
             torch.tensor(self.emotion_2[idx])
@@ -122,8 +126,6 @@ class DialogueTestDataset(Dataset):
         self.input_raws = df.q.tolist()
         self.label_ids = []
         self.label_raws = df.a.tolist()
-        # self.emotion_1 = df.emotion_1.tolist()
-        # self.emotion_2 = df.emotion_2.tolist()
 
         q_set = tokenizer.encode(self.input_raws)
         a_set = tokenizer.encode(self.label_raws)
@@ -152,17 +154,23 @@ def load_data_loader(ds, pad_token_id, batch_size, shuffle=False):
             self.pad_token_id = pad_token_id
 
         def __call__(self, data):
-            q_ids, input_ids, emotion_1, emotion_2 = zip(*data)
+            q_ids, q_lens, input_ids, emotion_1, emotion_2 = zip(*data)
             input_ids = pad_sequence(
                 input_ids,
                 batch_first=True,
                 padding_value=self.pad_token_id
             ).long()
+            q_ids = pad_sequence(
+                q_ids,
+                batch_first=True,
+                padding_value=self.pad_token_id
+            ).long()
             attention_ids = (input_ids != pad_token_id).float()
+            q_lens = torch.stack(q_lens, dim=0)
             emotion_1 = torch.stack(emotion_1, dim=0)
             emotion_2 = torch.stack(emotion_2, dim=0)
 
-            return q_ids, input_ids, attention_ids, emotion_1, emotion_2
+            return q_ids, q_lens, input_ids, attention_ids, emotion_1, emotion_2
 
     num_workers = get_num_workers()
     data_loader = DataLoader(

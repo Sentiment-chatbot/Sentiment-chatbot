@@ -175,9 +175,6 @@ def generate_with_data_loader(
     for step, (input_ids, input_raws, label_ids, label_raws) in enumerate(test_loader):
         input_ids, label_ids = input_ids.to(device), label_ids.to(device) # (1, q_len), (1, a_len)
 
-        if label_ids.size(-1) < 3: # For calculate score more valid sentence
-            continue
-
         pred_ids = []
         pred_logits = []
         while len(pred_ids) != label_ids.size(-1):
