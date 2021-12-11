@@ -20,7 +20,7 @@ def save_ckpt(ckpt_path, model, epoch, train_loss, best_loss):
         "best_loss" : best_loss
     }, ckpt_path)
     
-def validate(model, valid_loader, device):
+def validate(model, tokenizer, valid_loader, device):
     """ Validate with teacher forcing """
 
     criterion = nn.CrossEntropyLoss()
@@ -50,7 +50,6 @@ def validate(model, valid_loader, device):
                 emo_labels.view(lm_labels.size(0), 1),
                 lm_labels
             ], dim=1)
-            lm_optimizer.zero_grad()
             lm_logits = lm_logits[:, :-1, :].contiguous() # (N, seq_len - 1, vocab_size)
             lm_loss = criterion(lm_logits.view(-1, lm_logits.size(-1)), lm_labels.view(-1))
 
@@ -163,7 +162,7 @@ def train(
 
         # scheduler.step()
         train_loss.append(epoch_loss / len(train_loader))
-        valid_loss, valid_ppl = validate(model, valid_loader, device)
+        valid_loss, valid_ppl = validate(model, tokenizer, valid_loader, device)
     
         if valid_ppl < best_ppl:
             best_ppl = valid_ppl

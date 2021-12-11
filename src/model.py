@@ -319,7 +319,7 @@ class EmoGPT2(nn.Module):
         )
         self.emo_classifier = EmoClassifier(**emo_classifier_conf)
         self.emo_token_id = tokenizer.vocab.emo_token_id
-        
+
         self.device = device
 
     def get_input_embeddings(self):
@@ -364,11 +364,12 @@ class EmoGPT2(nn.Module):
             input_ids[:, 1:]
         ], dim=1)
 
-        attention_ids = torch.cat([
-            attention_ids[:, :1], 
-            torch.ones(batch_size, 2),
-            attention_ids[:, 1:]
-        ], dim=1)
+        if attention_ids is not None:
+            attention_ids = torch.cat([
+                attention_ids[:, :1], 
+                torch.ones(batch_size, 2),
+                attention_ids[:, 1:]
+            ], dim=1)
 
         lm_logits = self.gpt(input_ids, attention_ids)
 

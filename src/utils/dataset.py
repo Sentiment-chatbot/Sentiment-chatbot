@@ -121,11 +121,18 @@ class DialogueTestDataset(Dataset):
     """ Dialogue dataset for test """
     def __init__(self, df, vocab, tokenizer):
         super().__init__()
+        emotion_1_types = sorted(df.emotion_1.unique())
+        emotion_1_dict = {name: i for i, name in enumerate(emotion_1_types)}
+
+        df = df.replace({
+            'emotion_1': emotion_1_dict
+        })
 
         self.input_ids = []
         self.input_raws = df.q.tolist()
         self.label_ids = []
         self.label_raws = df.a.tolist()
+        self.emotion_1 = df.emotion_1.tolist()
 
         q_set = tokenizer.encode(self.input_raws)
         a_set = tokenizer.encode(self.label_raws)
@@ -134,12 +141,18 @@ class DialogueTestDataset(Dataset):
             self.input_ids.append(input_id)
             self.label_ids.append(a + [vocab.eos_token_id])
 
+        self.q_ids = q_set
+        self.q_lens = [len(q) for q in q_set]
+
     def __getitem__(self, idx):
         return (
+            torch.tensor(self.q_ids[idx]),
+            torch.tensor(self.q_lens[idx]),
             torch.tensor(self.input_ids[idx]),
             self.input_raws[idx],
             torch.tensor(self.label_ids[idx]),
-            self.label_raws[idx]
+            self.label_raws[idx],
+            torch.tensor(self.emotion_1[idx]),
         )
 
     def __len__(self):
